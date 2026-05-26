@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d1f0f">
+<title>Monitor Hidráulico y Eléctrico</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0b1a0d;
+  --bg2:#0d1f0f;
+  --surface:#112214;
+  --surface2:#162a18;
+  --surface3:#1c3320;
+  --border:#244a28;
+  --border2:#2d5e33;
+  --text:#c8e6c9;
+  --text2:#6a9b6e;
+  --text3:#3d5e40;
+  --green:#4caf50;
+  --green2:#81c784;
+  --red:#ef5350;
+  --amber:#ffb300;
+  --blue:#42a5f5;
+  --cyan:#26c6da;
+  --elec:#ffb300;
+  --water:#42a5f5;
+  --mono:'Share Tech Mono',monospace;
+  --sans:'Barlow',sans-serif;
+  --cond:'Barlow Condensed',sans-serif;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);}
+body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text);}
+
+/* ── HEADER ── */
+#hdr{
+  background:var(--surface);
+  border-bottom:2px solid var(--border2);
+  display:flex;align-items:center;gap:0;
+  flex-shrink:0;height:48px;
+  position:relative;
+}
+#hdr-brand{
+  padding:0 16px;
+  display:flex;align-items:center;gap:8px;
+  border-right:1px solid var(--border2);
+  height:100%;
+}
+#hdr-brand .logo{
+  font-family:var(--cond);font-size:17px;font-weight:700;
+  color:var(--green2);letter-spacing:1px;white-space:nowrap;
+}
+#hdr-brand .sub{
+  font-family:var(--mono);font-size:9px;color:var(--text2);
+  line-height:1.2;
+}
+#tabs{display:flex;height:100%;}
+.tab{
+  padding:0 14px;
+  border:none;border-right:1px solid var(--border);
+  background:transparent;color:var(--text2);
+  font-family:var(--cond);font-size:13px;font-weight:600;
+  letter-spacing:0.5px;cursor:pointer;
+  display:flex;align-items:center;gap:6px;
+  transition:all .15s;
+  position:relative;
+}
+.tab:hover{background:var(--surface2);color:var(--text);}
+.tab.active{background:var(--surface3);color:var(--green2);}
+.tab.active::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:var(--green2);
+}
+#hdr-status{
+  margin-left:auto;padding:0 14px;
+  display:flex;gap:16px;align-items:center;
+  border-left:1px solid var(--border2);height:100%;
+}
+.hdr-badge{
+  font-family:var(--mono);font-size:11px;
+  display:flex;align-items:center;gap:5px;
+}
+.hdr-badge .dot{width:7px;height:7px;border-radius:50%;}
+.dot-green{background:var(--green);box-shadow:0 0 6px var(--green);}
+.dot-red{background:var(--red);box-shadow:0 0 6px var(--red);}
+.dot-amber{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+.hdr-time{font-family:var(--mono);font-size:11px;color:var(--text2);}
+
+/* ── MAIN LAYOUT ── */
+#main{flex:1;display:flex;overflow:hidden;}
+#map-wrap{flex:1;position:relative;}
+#map{width:100%;height:100%;}
+
+/* ── SIDE PANEL ── */
+#panel{
+  width:280px;background:var(--surface);
+  border-left:2px solid var(--border2);
+  display:flex;flex-direction:column;overflow:hidden;
+  flex-shrink:0;
+}
+.pview{display:none;flex-direction:column;height:100%;overflow:hidden;}
+.pview.active{display:flex;}
+
+/* ── PANEL HEADER ── */
+.ph{
+  padding:10px 12px;
+  border-bottom:1px solid var(--border2);
+  font-family:var(--cond);font-size:11px;font-weight:700;
+  letter-spacing:1.5px;color:var(--text2);
+  text-transform:uppercase;flex-shrink:0;
+}
+
+/* ── STATUS GRID ── */
+.stat-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:6px;
+  padding:10px 10px 6px;flex-shrink:0;
+}
+.stat-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:8px 10px;
+}
+.stat-card .sv{
+  font-family:var(--mono);font-size:22px;font-weight:400;
+  line-height:1;
+}
+.stat-card .sl{
+  font-family:var(--cond);font-size:10px;font-weight:600;
+  letter-spacing:.5px;color:var(--text2);margin-top:3px;
+}
+.sv-green{color:var(--green2);}
+.sv-red{color:var(--red);}
+.sv-amber{color:var(--amber);}
+.sv-blue{color:var(--blue);}
+
+/* ── SECTION LABEL ── */
+.sec-lbl{
+  padding:6px 12px;
+  font-family:var(--cond);font-size:10px;font-weight:700;
+  letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+
+/* ── SCROLLABLE AREA ── */
+.scroll{flex:1;overflow-y:auto;}
+.scroll::-webkit-scrollbar{width:3px;}
+.scroll::-webkit-scrollbar-track{background:transparent;}
+.scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ── ELEMENT ITEM ── */
+.ei{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .12s;
+}
+.ei:hover{background:var(--surface2);}
+.ei-ico{font-size:16px;width:22px;text-align:center;flex-shrink:0;}
+.ei-info{flex:1;min-width:0;}
+.ei-name{
+  font-family:var(--sans);font-size:12px;font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ei-sub{
+  font-family:var(--mono);font-size:9px;color:var(--text2);margin-top:1px;
+}
+.llave-btn{
+  padding:3px 8px;border-radius:3px;border:none;
+  font-family:var(--cond);font-size:10px;font-weight:700;
+  letter-spacing:.5px;cursor:pointer;flex-shrink:0;
+  transition:all .15s;
+}
+.lb-open{background:rgba(76,175,80,.15);color:var(--green2);border:1px solid rgba(76,175,80,.3);}
+.lb-closed{background:rgba(239,83,80,.15);color:var(--red);border:1px solid rgba(239,83,80,.3);}
+
+/* ── POTREROS ── */
+.potrero-card{
+  margin:6px 8px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:8px 10px;
+}
+.pc-name{
+  font-family:var(--cond);font-size:13px;font-weight:700;
+  margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;
+}
+.pc-badge{
+  font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:2px;
+}
+.pc-avail{background:rgba(76,175,80,.15);color:var(--green2);border:1px solid rgba(76,175,80,.3);}
+.pc-unavail{background:rgba(239,83,80,.15);color:var(--red);border:1px solid rgba(239,83,80,.3);}
+.pc-pills{display:flex;gap:5px;flex-wrap:wrap;}
+.pill{
+  font-family:var(--mono);font-size:9px;
+  padding:2px 7px;border-radius:2px;
+}
+.pill-ok{background:rgba(76,175,80,.1);color:var(--green2);border:1px solid rgba(76,175,80,.2);}
+.pill-nok{background:rgba(239,83,80,.1);color:var(--red);border:1px solid rgba(239,83,80,.2);}
+.pill-uk{background:rgba(100,100,100,.1);color:var(--text2);border:1px solid rgba(100,100,100,.2);}
+
+/* ── HISTORIAL ── */
+.hist-item{
+  padding:8px 10px;border-bottom:1px solid var(--border);
+}
+.hi-time{
+  font-family:var(--mono);font-size:9px;color:var(--text2);margin-bottom:2px;
+}
+.hi-action{font-size:12px;line-height:1.3;}
+.hi-result{font-size:10px;color:var(--text2);margin-top:2px;font-style:italic;}
+
+/* ── CONFIG ── */
+.cfg-scroll{flex:1;overflow-y:auto;padding:10px;}
+.cfg-scroll::-webkit-scrollbar{width:3px;}
+.cfg-scroll::-webkit-scrollbar-thumb{background:var(--border2);}
+.cfg-sect{margin-bottom:14px;}
+.cfg-sect h4{
+  font-family:var(--cond);font-size:10px;font-weight:700;
+  letter-spacing:1.5px;color:var(--text2);text-transform:uppercase;
+  margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);
+}
+.drop-zone{
+  border:2px dashed var(--border2);border-radius:6px;
+  padding:16px;text-align:center;cursor:pointer;
+  font-family:var(--cond);font-size:12px;color:var(--text2);
+  transition:all .2s;
+}
+.drop-zone:hover{border-color:var(--green2);color:var(--text);}
+.cbtn{
+  display:block;width:100%;padding:7px 10px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:4px;color:var(--text);
+  font-family:var(--cond);font-size:12px;font-weight:600;
+  letter-spacing:.3px;cursor:pointer;margin-bottom:5px;
+  text-align:left;transition:all .15s;
+}
+.cbtn:hover{background:var(--surface3);border-color:var(--border2);}
+.cbtn-primary{border-color:var(--green2);color:var(--green2);}
+.cbtn-danger{border-color:var(--red);color:var(--red);}
+.cfg-ei{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 0;border-bottom:1px solid var(--border);
+  font-size:11px;
+}
+.cfg-ei-ico{font-size:13px;width:18px;text-align:center;}
+.cfg-ei-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cfg-ei-btns button{
+  background:transparent;border:none;cursor:pointer;font-size:12px;
+  padding:2px 4px;opacity:.6;transition:opacity .15s;
+}
+.cfg-ei-btns button:hover{opacity:1;}
+
+/* ── MODALS ── */
+.modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.75);backdrop-filter:blur(3px);
+  z-index:2000;align-items:center;justify-content:center;padding:16px;
+}
+.modal.open{display:flex;}
+.mbox{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:10px;padding:20px;width:100%;max-width:360px;
+  box-shadow:0 20px 60px rgba(0,0,0,.6);
+}
+.mbox h2{
+  font-family:var(--cond);font-size:16px;font-weight:700;
+  letter-spacing:.5px;margin-bottom:14px;color:var(--green2);
+}
+.mbox label{
+  display:block;font-family:var(--mono);font-size:9px;letter-spacing:1px;
+  color:var(--text2);text-transform:uppercase;margin:10px 0 4px;
+}
+.mbox input,.mbox select{
+  width:100%;padding:7px 10px;
+  background:var(--surface2);border:1px solid var(--border2);
+  border-radius:4px;color:var(--text);
+  font-family:var(--sans);font-size:13px;
+  outline:none;transition:border-color .15s;
+}
+.mbox input:focus,.mbox select:focus{border-color:var(--green2);}
+.mbox select option{background:var(--surface2);}
+.mactions{display:flex;gap:8px;margin-top:16px;}
+.mactions button{
+  flex:1;padding:10px;border-radius:5px;
+  font-family:var(--cond);font-size:13px;font-weight:700;
+  letter-spacing:.5px;cursor:pointer;border:none;
+  transition:all .15s;
+}
+.m-confirm{background:var(--green);color:#0a1a0b;}
+.m-confirm:hover{background:var(--green2);}
+.m-cancel{background:var(--surface2);color:var(--text2);border:1px solid var(--border);}
+.m-cancel:hover{background:var(--surface3);}
+.m-danger{background:var(--red);color:#fff;}
+
+/* ── SIM PREVIEW ── */
+.sim-box{
+  background:rgba(255,179,0,.06);border:1px solid rgba(255,179,0,.25);
+  border-radius:6px;padding:10px 12px;margin-bottom:12px;
+}
+.sim-box.empty{
+  background:rgba(66,165,245,.06);border-color:rgba(66,165,245,.25);
+}
+.sim-title{
+  font-family:var(--mono);font-size:10px;color:var(--amber);
+  margin-bottom:6px;letter-spacing:.5px;
+}
+.sim-box.empty .sim-title{color:var(--blue);}
+.sim-list{font-size:11px;color:var(--text2);padding-left:12px;}
+.sim-list li{margin-bottom:2px;}
+
+/* ── CONNECTION MODE ── */
+#conn-banner{
+  display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  background:var(--amber);color:#1a0a00;
+  padding:6px 16px;border-radius:20px;
+  font-family:var(--cond);font-size:12px;font-weight:700;
+  letter-spacing:.5px;z-index:500;white-space:nowrap;
+  box-shadow:0 4px 20px rgba(255,179,0,.4);
+}
+
+/* ── FEATURE QUEUE PROGRESS ── */
+#feat-prog{
+  font-family:var(--mono);font-size:10px;color:var(--text2);
+  margin-bottom:10px;
+}
+.feat-geom-preview{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:4px;padding:6px 10px;margin-bottom:10px;
+  font-family:var(--mono);font-size:10px;color:var(--text2);
+}
+
+/* ── EMPTY STATE ── */
+.empty-state{
+  padding:30px 16px;text-align:center;
+  font-family:var(--cond);font-size:12px;color:var(--text3);
+  line-height:1.6;
+}
+.empty-state .big{font-size:28px;margin-bottom:8px;}
+
+/* ── MAP OVERLAY LEGEND ── */
+#map-legend{
+  position:absolute;bottom:24px;left:10px;z-index:400;
+  background:rgba(11,26,13,.85);backdrop-filter:blur(4px);
+  border:1px solid var(--border2);border-radius:6px;
+  padding:8px 10px;font-family:var(--mono);font-size:10px;
+  pointer-events:none;
+}
+.leg-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;color:var(--text2);}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* MOBILE */
+@media(max-width:640px){
+  #panel{
+    position:absolute;bottom:0;left:0;right:0;
+    width:100%;height:45%;z-index:300;
+    border-left:none;border-top:2px solid var(--border2);
+  }
+  #main{flex-direction:column;position:relative;}
+  #map-wrap{flex:none;height:55%;}
+  #hdr-status{display:none;}
+  .tab{padding:0 10px;font-size:12px;}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="hdr">
+  <div id="hdr-brand">
+    <div>
+      <div class="logo">⚡💧 INFRAESTRUCTURA</div>
+      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO</div>
+    </div>
+  </div>
+  <div id="tabs">
+    <button class="tab active" data-tab="mapa" onclick="switchTab('mapa',this)">🗺 MAPA</button>
+    <button class="tab" data-tab="potreros" onclick="switchTab('potreros',this)">🌿 POTREROS</button>
+    <button class="tab" data-tab="historial" onclick="switchTab('historial',this)">📋 LOG</button>
+    <button class="tab" data-tab="config" onclick="switchTab('config',this)">⚙ CONFIG</button>
+  </div>
+  <div id="hdr-status">
+    <div class="hdr-badge"><div class="dot dot-green" id="hdr-elec-dot"></div><span id="hdr-elec-txt" style="font-size:10px;color:var(--text2)"></span></div>
+    <div class="hdr-badge"><div class="dot dot-blue" id="hdr-agua-dot"></div><span id="hdr-agua-txt" style="font-size:10px;color:var(--text2)"></span></div>
+    <div class="hdr-time" id="hdr-clock"></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div id="conn-banner">Modo conexión — tocá el primer elemento</div>
+    <div id="map-legend">
+      <div class="leg-row"><div class="leg-dot" style="background:#4caf50"></div>Potrero OK</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#ef5350"></div>Sin servicio</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#ffb300"></div>Parcial</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#42a5f5"></div>Agua</div>
+    </div>
+  </div>
+
+  <div id="panel">
+
+    <!-- MAPA PANEL -->
+    <div class="pview active" id="pv-mapa">
+      <div class="ph">ESTADO GENERAL</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="sv sv-green" id="s-elec-ok">—</div><div class="sl">⚡ ENERGIZADO</div></div>
+        <div class="stat-card"><div class="sv sv-red" id="s-elec-nok">—</div><div class="sl">⚡ SIN ENERGÍA</div></div>
+        <div class="stat-card"><div class="sv sv-blue" id="s-agua-ok">—</div><div class="sl">💧 CON AGUA</div></div>
+        <div class="stat-card"><div class="sv sv-amber" id="s-agua-nok">—</div><div class="sl">💧 SIN AGUA</div></div>
+      </div>
+      <div class="sec-lbl">LLAVES</div>
+      <div class="scroll" id="llave-list">
+        <div class="empty-state"><div class="big">🔌</div>Sin llaves configuradas.<br>Importá un KMZ en Config.</div>
+      </div>
+    </div>
+
+    <!-- POTREROS PANEL -->
+    <div class="pview" id="pv-potreros">
+      <div class="ph">ESTADO POR POTRERO</div>
+      <div class="scroll" id="potrero-list">
+        <div class="empty-state"><div class="big">🌿</div>Sin potreros configurados.</div>
+      </div>
+    </div>
+
+    <!-- HISTORIAL PANEL -->
+    <div class="pview" id="pv-historial">
+      <div class="ph" style="display:flex;justify-content:space-between;align-items:center">
+        <span>LOG DE OPERACIONES</span>
+        <button onclick="clearHistory()" style="background:transparent;border:none;color:var(--text2);font-size:11px;cursor:pointer;font-family:var(--mono)">[ limpiar ]</button>
+      </div>
+      <div class="scroll" id="hist-list">
+        <div class="empty-state"><div class="big">📋</div>Sin registros todavía.</div>
+      </div>
+    </div>
+
+    <!-- CONFIG PANEL -->
+    <div class="pview" id="pv-config">
+      <div class="ph">CONFIGURACIÓN</div>
+      <div class="cfg-scroll">
+
+        <div class="cfg-sect">
+          <h4>📂 Importar Mapa</h4>
+          <div class="drop-zone" onclick="document.getElementById('fi-kmz').click()">
+            Seleccionar archivo KMZ / KML
+          </div>
+          <input type="file" id="fi-kmz" accept=".kmz,.kml" style="display:none" onchange="importKMZ(this)">
+        </div>
+
+        <div class="cfg-sect">
+          <h4>➕ Elementos</h4>
+          <button class="cbtn cbtn-primary" onclick="showAddElem()">+ Nuevo elemento manual</button>
+          <button class="cbtn" onclick="startConnMode()">🔗 Conectar dos elementos</button>
+        </div>
+
+        <div class="cfg-sect">
+          <h4>📦 Todos los Elementos (<span id="cfg-elem-count">0</span>)</h4>
+          <div id="cfg-elem-list"><div style="font-size:11px;color:var(--text3)">Sin elementos</div></div>
+        </div>
+
+        <div class="cfg-sect">
+          <h4>🔗 Conexiones (<span id="cfg-conn-count">0</span>)</h4>
+          <div id="cfg-conn-list"><div style="font-size:11px;color:var(--text3)">Sin conexiones</div></div>
+        </div>
+
+        <div class="cfg-sect">
+          <h4>💾 Datos</h4>
+          <button class="cbtn" onclick="exportJSON()">↓ Exportar configuración JSON</button>
+          <button class="cbtn" onclick="document.getElementById('fi-json').click()">↑ Importar configuración JSON</button>
+          <input type="file" id="fi-json" accept=".json" style="display:none" onchange="importJSON(this)">
+          <button class="cbtn cbtn-danger" onclick="resetAll()">✕ Borrar todo</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /panel -->
+</div><!-- /main -->
+
+<!-- MODAL: Add/Edit Element -->
+<div class="modal" id="m-elem">
+  <div class="mbox">
+    <h2 id="m-elem-title">NUEVO ELEMENTO</h2>
+    <input type="hidden" id="e-id">
+    <label>Nombre</label>
+    <input id="e-name" type="text" placeholder="Ej: Llave Ramal Norte">
+    <label>Tipo</label>
+    <select id="e-type" onchange="onETypeChange()">
+      <optgroup label="─ Sistema Eléctrico ─">
+        <option value="energizador">⚡ Energizador</option>
+        <option value="llave_elec">🔌 Llave Eléctrica</option>
+      </optgroup>
+      <optgroup label="─ Sistema de Agua ─">
+        <option value="tanque">💧 Tanque</option>
+        <option value="llave_agua">🚰 Llave de Agua</option>
+        <option value="bebedero">🐄 Bebedero</option>
+      </optgroup>
+      <optgroup label="─ General ─">
+        <option value="potrero">🌿 Potrero</option>
+      </optgroup>
+    </select>
+    <div id="e-sistema-row">
+      <label>Sistema</label>
+      <select id="e-sistema">
+        <option value="1">Sistema 1</option>
+        <option value="2">Sistema 2</option>
+      </select>
+    </div>
+    <label>Estado inicial</label>
+    <select id="e-estado">
+      <option value="1">Activo / Abierta</option>
+      <option value="0">Inactivo / Cerrada</option>
+    </select>
+    <div class="mactions">
+      <button class="m-cancel" onclick="closeModal('m-elem')">Cancelar</button>
+      <button class="m-confirm" onclick="saveElem()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Toggle Llave -->
+<div class="modal" id="m-toggle">
+  <div class="mbox">
+    <h2 id="m-toggle-title">CAMBIAR ESTADO</h2>
+    <input type="hidden" id="toggle-id">
+    <div id="toggle-sim"></div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">¿Confirmar operación?</p>
+    <div class="mactions">
+      <button class="m-cancel" onclick="closeModal('m-toggle')">Cancelar</button>
+      <button class="m-confirm" onclick="confirmToggle()">✔ Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Classify KMZ feature -->
+<div class="modal" id="m-feat">
+  <div class="mbox">
+    <h2>CLASIFICAR ELEMENTO</h2>
+    <div id="feat-prog" class="feat-geom-preview"></div>
+    <p id="feat-name-lbl" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--green2)"></p>
+    <div class="feat-geom-preview" id="feat-geom-lbl"></div>
+    <label>¿Qué es este elemento?</label>
+    <select id="f-type">
+      <option value="skip">— Ignorar este elemento —</option>
+      <optgroup label="─ Sistema Eléctrico ─">
+        <option value="energizador">⚡ Energizador</option>
+        <option value="llave_elec">🔌 Llave Eléctrica</option>
+      </optgroup>
+      <optgroup label="─ Sistema de Agua ─">
+        <option value="tanque">💧 Tanque</option>
+        <option value="llave_agua">🚰 Llave de Agua</option>
+        <option value="bebedero">🐄 Bebedero</option>
+      </optgroup>
+      <optgroup label="─ General ─">
+        <option value="potrero">🌿 Potrero</option>
+      </optgroup>
+    </select>
+    <label>Sistema</label>
+    <select id="f-sistema">
+      <option value="1">Sistema 1</option>
+      <option value="2">Sistema 2</option>
+    </select>
+    <input type="hidden" id="f-idx">
+    <div class="mactions">
+      <button class="m-cancel" onclick="skipFeat()">Omitir →</button>
+      <button class="m-confirm" onclick="classifyFeat()">Clasificar ✔</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const TYPES = {
+  energizador: { ico:'⚡', lbl:'Energizador',     color:'#ffb300', net:'elec', src:true  },
+  llave_elec:  { ico:'🔌', lbl:'Llave Eléctrica', color:'#ffb300', net:'elec', valve:true },
+  tanque:      { ico:'💧', lbl:'Tanque',           color:'#42a5f5', net:'agua', src:true  },
+  llave_agua:  { ico:'🚰', lbl:'Llave de Agua',   color:'#42a5f5', net:'agua', valve:true },
+  bebedero:    { ico:'🐄', lbl:'Bebedero',         color:'#26c6da', net:'agua' },
+  potrero:     { ico:'🌿', lbl:'Potrero',          color:'#4caf50', net:'both' },
+};
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).substr(2,5); }
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let S = { elems:{}, conns:[], hist:[], pendingFeats:[], featIdx:0 };
+
+// ═══════════════════════════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════════════════════════
+const map = L.map('map',{zoomControl:true}).setView([-33.0,-56.0],11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap',maxZoom:20
+}).addTo(map);
+const baseLayer = L.layerGroup().addTo(map);
+const elemLayer = L.layerGroup().addTo(map);
+
+// ═══════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════
+function switchTab(name, btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.pview').forEach(v=>v.classList.remove('active'));
+  document.getElementById('pv-'+name).classList.add('active');
+  if(name==='potreros') renderPotreros();
+  if(name==='historial') renderHist();
+  if(name==='config') renderConfig();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════════════
+function tickClock(){
+  const n=new Date();
+  document.getElementById('hdr-clock').textContent=
+    n.toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(tickClock,1000); tickClock();
+
+// ═══════════════════════════════════════════════════════════
+// KMZ / KML IMPORT
+// ═══════════════════════════════════════════════════════════
+async function importKMZ(inp){
+  const f=inp.files[0]; if(!f) return;
+  let kml;
+  try{
+    if(f.name.toLowerCase().endsWith('.kml')){
+      kml=await f.text();
+    } else {
+      const zip=await JSZip.loadAsync(f);
+      const kf=Object.values(zip.files).find(x=>x.name.endsWith('.kml'));
+      if(!kf){ alert('No se encontró archivo KML dentro del KMZ'); return; }
+      kml=await kf.async('text');
+    }
+  }catch(e){ alert('Error al leer el archivo: '+e.message); return; }
+  finally{ inp.value=''; }
+
+  const feats=parseKML(kml);
+  if(!feats.length){ alert('No se encontraron elementos con geometría.'); return; }
+
+  // draw KMZ base layer
+  baseLayer.clearLayers();
+  feats.forEach(f=>{
+    if(f.geom.type==='Polygon'){
+      L.polygon(f.geom.coords,{color:'#3d5e40',weight:1.5,fillOpacity:0.08}).bindTooltip(f.name).addTo(baseLayer);
+    } else if(f.geom.type==='LineString'){
+      L.polyline(f.geom.coords,{color:'#3d5e40',weight:1.5,opacity:0.5}).addTo(baseLayer);
+    }
+  });
+  try{
+    const all=[...baseLayer.getLayers()];
+    if(all.length){ const b=L.featureGroup(all).getBounds(); if(b.isValid()) map.fitBounds(b,{padding:[30,30]}); }
+  }catch(e){}
+
+  S.pendingFeats=feats;
+  S.featIdx=0;
+  showNextFeat();
+}
+
+function parseKML(txt){
+  const doc=new DOMParser().parseFromString(txt,'text/xml');
+  const feats=[];
+  doc.querySelectorAll('Placemark').forEach(pm=>{
+    const name=pm.querySelector('name')?.textContent?.trim()||'Sin nombre';
+    let geom=null;
+
+    const pt=pm.querySelector('Point > coordinates');
+    if(pt){
+      const parts=pt.textContent.trim().split(',');
+      const lng=parseFloat(parts[0]),lat=parseFloat(parts[1]);
+      if(!isNaN(lat)&&!isNaN(lng)) geom={type:'Point',lat,lng};
+    }
+    if(!geom){
+      const poly=pm.querySelector('Polygon outerBoundaryIs LinearRing coordinates');
+      if(poly){
+        const coords=poly.textContent.trim().split(/\s+/).map(c=>{
+          const p=c.split(','); return [parseFloat(p[1]),parseFloat(p[0])];
+        }).filter(c=>!isNaN(c[0])&&!isNaN(c[1]));
+        if(coords.length>=3){
+          const lat=coords.reduce((s,c)=>s+c[0],0)/coords.length;
+          const lng=coords.reduce((s,c)=>s+c[1],0)/coords.length;
+          geom={type:'Polygon',coords,lat,lng};
+        }
+      }
+    }
+    if(!geom){
+      const ls=pm.querySelector('LineString coordinates');
+      if(ls){
+        const coords=ls.textContent.trim().split(/\s+/).map(c=>{
+          const p=c.split(','); return [parseFloat(p[1]),parseFloat(p[0])];
+        }).filter(c=>!isNaN(c[0])&&!isNaN(c[1]));
+        if(coords.length>=2){
+          geom={type:'LineString',coords,lat:coords[0][0],lng:coords[0][1]};
+        }
+      }
+    }
+    if(geom) feats.push({name,geom});
+  });
+  return feats;
+}
+
+function showNextFeat(){
+  const feats=S.pendingFeats, idx=S.featIdx;
+  if(idx>=feats.length){
+    S.pendingFeats=[]; closeModal('m-feat');
+    renderAll(); save();
+    addHist('Sistema',`KMZ importado — ${Object.keys(S.elems).length} elementos clasificados.`);
+    return;
+  }
+  const f=feats[idx];
+  document.getElementById('feat-prog').textContent=`Elemento ${idx+1} de ${feats.length}`;
+  document.getElementById('feat-name-lbl').textContent=`"${f.name}"`;
+  document.getElementById('feat-geom-lbl').textContent=`Geometría: ${f.geom.type}  |  lat:${f.geom.lat.toFixed(5)}, lng:${f.geom.lng.toFixed(5)}`;
+  document.getElementById('f-idx').value=idx;
+
+  // auto-guess
+  const n=f.name.toLowerCase();
+  let g='skip';
+  if(/potrero|potr|campo/.test(n)) g='potrero';
+  else if(/tanque/.test(n)) g='tanque';
+  else if(/bebedero|bebe/.test(n)) g='bebedero';
+  else if(/energizador|electr/.test(n)) g='energizador';
+  else if((/llave|val/).test(n)&&(/agua|paso|hidro/).test(n)) g='llave_agua';
+  else if(/llave/.test(n)) g='llave_elec';
+  document.getElementById('f-type').value=g;
+
+  // highlight
+  try{ map.setView([f.geom.lat,f.geom.lng],15); }catch(e){}
+  document.getElementById('m-feat').classList.add('open');
+}
+
+function classifyFeat(){
+  const idx=parseInt(document.getElementById('f-idx').value);
+  const type=document.getElementById('f-type').value;
+  const sist=parseInt(document.getElementById('f-sistema').value);
+  if(type!=='skip'){
+    const f=S.pendingFeats[idx];
+    const id=uid();
+    S.elems[id]={id,type,name:f.name,geom:f.geom,on:true,sistema:sist,fromKMZ:true};
+  }
+  closeModal('m-feat');
+  S.featIdx=idx+1; showNextFeat();
+}
+function skipFeat(){
+  const idx=parseInt(document.getElementById('f-idx').value);
+  closeModal('m-feat');
+  S.featIdx=idx+1; showNextFeat();
+}
+
+// ═══════════════════════════════════════════════════════════
+// GRAPH — STATE PROPAGATION
+// ═══════════════════════════════════════════════════════════
+function calcStates(){
+  const elems=S.elems, conns=S.conns;
+  const adj={};
+  Object.keys(elems).forEach(id=>{adj[id]=[];});
+  conns.forEach(c=>{
+    if(adj[c.from]) adj[c.from].push({to:c.to,net:c.net});
+    if(adj[c.to])   adj[c.to].push({to:c.from,net:c.net});
+  });
+
+  function bfs(sources, net, stopType){
+    const reached=new Set();
+    const q=[...sources];
+    q.forEach(id=>reached.add(id));
+    while(q.length){
+      const cur=q.shift();
+      (adj[cur]||[]).forEach(edge=>{
+        if(edge.net!==net&&edge.net!=='both') return;
+        if(reached.has(edge.to)) return;
+        const el=elems[edge.to]; if(!el) return;
+        if(el.type===stopType&&!el.on) return;
+        reached.add(edge.to);
+        q.push(edge.to);
+      });
+    }
+    return reached;
+  }
+
+  const elecSrcs=Object.values(elems).filter(e=>e.type==='energizador'&&e.on).map(e=>e.id);
+  const aguaSrcs=Object.values(elems).filter(e=>e.type==='tanque'&&e.on).map(e=>e.id);
+
+  const energized=bfs(elecSrcs,'elec','llave_elec');
+  const watered=bfs(aguaSrcs,'agua','llave_agua');
+
+  return {energized, watered};
+}
+
+function simToggle(id){
+  const el=S.elems[id];
+  const was=el.on;
+  el.on=!was;
+  const after=calcStates();
+  el.on=was;
+  const before=calcStates();
+
+  const potreros=Object.values(S.elems).filter(e=>e.type==='potrero');
+  const bebs=Object.values(S.elems).filter(e=>e.type==='bebedero');
+  const changes=[];
+
+  potreros.forEach(p=>{
+    const be=before.energized.has(p.id), ae=after.energized.has(p.id);
+    const bw=before.watered.has(p.id),   aw=after.watered.has(p.id);
+    if(be!==ae) changes.push(`${p.name}: eléctrico → ${ae?'✅ ON':'❌ OFF'}`);
+    if(bw!==aw) changes.push(`${p.name}: agua → ${aw?'✅ ON':'❌ OFF'}`);
+  });
+  bebs.forEach(b=>{
+    const bw=before.watered.has(b.id), aw=after.watered.has(b.id);
+    if(bw!==aw) changes.push(`${b.name}: agua → ${aw?'✅ ON':'❌ OFF'}`);
+  });
+  return changes;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOGGLE
+// ═══════════════════════════════════════════════════════════
+let pendingTgl=null;
+
+function askToggle(id){
+  const el=S.elems[id]; if(!el) return;
+  pendingTgl=id;
+  const newState=!el.on;
+  const ti=TYPES[el.type];
+  document.getElementById('m-toggle-title').textContent=(newState?'ABRIR ':'CERRAR ')+el.name.toUpperCase();
+
+  const changes=simToggle(id);
+  const simDiv=document.getElementById('toggle-sim');
+  if(changes.length){
+    simDiv.innerHTML=`<div class="sim-box"><div class="sim-title">⚠ SIMULACIÓN — CAMBIOS ESPERADOS</div>
+      <ul class="sim-list">${changes.map(c=>`<li>${c}</li>`).join('')}</ul></div>`;
+  } else {
+    simDiv.innerHTML=`<div class="sim-box empty"><div class="sim-title">ℹ SIN CAMBIOS EN POTREROS NI BEBEDEROS</div></div>`;
+  }
+  document.getElementById('m-toggle').classList.add('open');
+}
+
+function confirmToggle(){
+  if(!pendingTgl) return;
+  const el=S.elems[pendingTgl];
+  const wasOn=el.on;
+  el.on=!wasOn;
+  const {energized,watered}=calcStates();
+  const affected=simToggle(pendingTgl); // already toggled, so this gives reverse — we want the description
+  addHist('Operación',`${wasOn?'Cerró':'Abrió'} "${el.name}"`,
+    affected.length? affected.join(' | ') : 'Sin cambios en potreros');
+  closeModal('m-toggle');
+  pendingTgl=null;
+  renderAll(); save();
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER — MAP
+// ═══════════════════════════════════════════════════════════
+function renderAll(){
+  const {energized,watered}=calcStates();
+  renderMap(energized,watered);
+  renderLlaves(energized,watered);
+  renderStats(energized,watered);
+  updateHdrBadges(energized,watered);
+}
+
+function renderMap(energized,watered){
+  elemLayer.clearLayers();
+
+  // Draw connection lines
+  S.conns.forEach(c=>{
+    const a=S.elems[c.from], b=S.elems[c.to];
+    if(!a||!b) return;
+    const col=c.net==='agua'?'#42a5f5':c.net==='elec'?'#ffb300':'#555';
+    L.polyline([[a.geom.lat,a.geom.lng],[b.geom.lat,b.geom.lng]],{
+      color:col,weight:1.5,opacity:.5,dashArray:'5 5'
+    }).addTo(elemLayer);
+  });
+
+  // Draw elements
+  Object.values(S.elems).forEach(el=>{
+    const ti=TYPES[el.type]; if(!ti) return;
+
+    let fillColor=ti.color;
+    let fillOpacity=el.on?0.85:0.25;
+    let radius=el.type==='potrero'?11:7;
+
+    if(el.type==='potrero'){
+      const hE=energized.has(el.id), hW=watered.has(el.id);
+      fillColor=(hE&&hW)?'#4caf50':(!hE&&!hW)?'#ef5350':'#ffb300';
+      fillOpacity=0.85;
+    }
+
+    // Polygon for potreros
+    if(el.geom.type==='Polygon'){
+      L.polygon(el.geom.coords,{
+        color:fillColor,fillColor,weight:2,fillOpacity:0.18
+      }).addTo(elemLayer);
+    }
+
+    // Marker
+    const m=L.circleMarker([el.geom.lat,el.geom.lng],{
+      radius,color:fillColor,fillColor,weight:2,fillOpacity
+    });
+
+    const valveStr=(ti.valve)?(el.on?' [ABIERTA]':' [CERRADA]'):'';
+    m.bindTooltip(`${ti.ico} ${el.name}${valveStr}`,{direction:'top',offset:[0,-8]});
+
+    m.on('click',()=>{
+      if(connMode){ handleConnClick(el.id); return; }
+      if(ti.valve){ askToggle(el.id); }
+    });
+
+    m.addTo(elemLayer);
+  });
+}
+
+function renderLlaves(energized,watered){
+  const llaves=Object.values(S.elems).filter(e=>TYPES[e.type]?.valve);
+  const div=document.getElementById('llave-list');
+  if(!llaves.length){
+    div.innerHTML='<div class="empty-state"><div class="big">🔌</div>Sin llaves configuradas.<br>Importá un KMZ en Config.</div>';
+    return;
+  }
+  div.innerHTML=llaves.map(el=>{
+    const ti=TYPES[el.type];
+    return `<div class="ei" onclick="askToggle('${el.id}')">
+      <span class="ei-ico">${ti.ico}</span>
+      <div class="ei-info">
+        <div class="ei-name">${el.name}</div>
+        <div class="ei-sub">${ti.lbl} · SIST.${el.sistema}</div>
+      </div>
+      <button class="llave-btn ${el.on?'lb-open':'lb-closed'}" onclick="event.stopPropagation();askToggle('${el.id}')">
+        ${el.on?'ABIERTA':'CERRADA'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function renderStats(energized,watered){
+  const pts=Object.values(S.elems).filter(e=>e.type==='potrero');
+  const eOk=pts.filter(p=>energized.has(p.id)).length;
+  const wOk=pts.filter(p=>watered.has(p.id)).length;
+  document.getElementById('s-elec-ok').textContent=eOk;
+  document.getElementById('s-elec-nok').textContent=pts.length-eOk;
+  document.getElementById('s-agua-ok').textContent=wOk;
+  document.getElementById('s-agua-nok').textContent=pts.length-wOk;
+}
+
+function updateHdrBadges(energized,watered){
+  const pts=Object.values(S.elems).filter(e=>e.type==='potrero');
+  if(!pts.length) return;
+  const eOk=pts.filter(p=>energized.has(p.id)).length;
+  const wOk=pts.filter(p=>watered.has(p.id)).length;
+  document.getElementById('hdr-elec-txt').textContent=`${eOk}/${pts.length} ⚡`;
+  document.getElementById('hdr-agua-txt').textContent=`${wOk}/${pts.length} 💧`;
+  document.getElementById('hdr-elec-dot').className='dot '+(eOk===pts.length?'dot-green':eOk>0?'dot-amber':'dot-red');
+  document.getElementById('hdr-agua-dot').style.background=wOk===pts.length?'#42a5f5':wOk>0?'#ffb300':'#ef5350';
+}
+
+function renderPotreros(){
+  const {energized,watered}=calcStates();
+  const pts=Object.values(S.elems).filter(e=>e.type==='potrero');
+  const div=document.getElementById('potrero-list');
+  if(!pts.length){
+    div.innerHTML='<div class="empty-state"><div class="big">🌿</div>Sin potreros configurados.</div>';
+    return;
+  }
+  const sorted=[...pts].sort((a,b)=>a.name.localeCompare(b.name,'es'));
+  div.innerHTML=sorted.map(p=>{
+    const hE=energized.has(p.id), hW=watered.has(p.id);
+    const avail=hE&&hW;
+    const borderCol=avail?'rgba(76,175,80,.3)':(!hE&&!hW)?'rgba(239,83,80,.3)':'rgba(255,179,0,.3)';
+    return `<div class="potrero-card" style="border-color:${borderCol}">
+      <div class="pc-name">🌿 ${p.name}
+        <span class="pc-badge ${avail?'pc-avail':'pc-unavail'}">${avail?'DISPONIBLE':'NO DISP.'}</span>
+      </div>
+      <div class="pc-pills">
+        <span class="pill ${hE?'pill-ok':'pill-nok'}">⚡ ${hE?'ENERGIZADO':'SIN ENERGÍA'}</span>
+        <span class="pill ${hW?'pill-ok':'pill-nok'}">💧 ${hW?'CON AGUA':'SIN AGUA'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// HISTORIAL
+// ═══════════════════════════════════════════════════════════
+function addHist(user,action,result){
+  S.hist.unshift({id:uid(),user,action,result:result||'',ts:new Date().toISOString()});
+  if(S.hist.length>300) S.hist.pop();
+}
+function renderHist(){
+  const div=document.getElementById('hist-list');
+  if(!S.hist.length){
+    div.innerHTML='<div class="empty-state"><div class="big">📋</div>Sin registros.</div>';
+    return;
+  }
+  div.innerHTML=S.hist.map(h=>{
+    const d=new Date(h.ts);
+    const ts=d.toLocaleDateString('es-UY')+' '+d.toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit'});
+    return `<div class="hist-item">
+      <div class="hi-time">👤 ${h.user} · ${ts}</div>
+      <div class="hi-action">${h.action}</div>
+      ${h.result?`<div class="hi-result">${h.result}</div>`:''}
+    </div>`;
+  }).join('');
+}
+function clearHistory(){
+  if(!confirm('¿Limpiar historial?')) return;
+  S.hist=[];
+  renderHist(); save();
+}
+
+// ═══════════════════════════════════════════════════════════
+// ELEMENTS — ADD / EDIT / DELETE
+// ═══════════════════════════════════════════════════════════
+function showAddElem(){
+  document.getElementById('m-elem-title').textContent='NUEVO ELEMENTO';
+  document.getElementById('e-id').value='';
+  document.getElementById('e-name').value='';
+  document.getElementById('e-type').value='llave_elec';
+  document.getElementById('e-sistema').value='1';
+  document.getElementById('e-estado').value='1';
+  onETypeChange();
+  document.getElementById('m-elem').classList.add('open');
+}
+function editElem(id){
+  const el=S.elems[id];
+  document.getElementById('m-elem-title').textContent='EDITAR ELEMENTO';
+  document.getElementById('e-id').value=id;
+  document.getElementById('e-name').value=el.name;
+  document.getElementById('e-type').value=el.type;
+  document.getElementById('e-sistema').value=el.sistema||1;
+  document.getElementById('e-estado').value=el.on?'1':'0';
+  onETypeChange();
+  document.getElementById('m-elem').classList.add('open');
+}
+function saveElem(){
+  const id=document.getElementById('e-id').value||uid();
+  const name=document.getElementById('e-name').value.trim();
+  const type=document.getElementById('e-type').value;
+  const sist=parseInt(document.getElementById('e-sistema').value);
+  const on=document.getElementById('e-estado').value==='1';
+  if(!name){ alert('Ingrese un nombre'); return; }
+  const existing=S.elems[id];
+  S.elems[id]={
+    id,type,name,sistema:sist,on,
+    geom:existing?.geom||{type:'Point',lat:map.getCenter().lat,lng:map.getCenter().lng},
+    fromKMZ:existing?.fromKMZ||false
+  };
+  closeModal('m-elem');
+  renderAll(); save();
+}
+function deleteElem(id){
+  if(!confirm('¿Eliminar elemento y sus conexiones?')) return;
+  delete S.elems[id];
+  S.conns=S.conns.filter(c=>c.from!==id&&c.to!==id);
+  renderAll(); renderConfig(); save();
+}
+function onETypeChange(){
+  const t=document.getElementById('e-type').value;
+  const show=['energizador','llave_elec','tanque','llave_agua'].includes(t);
+  document.getElementById('e-sistema-row').style.display=show?'block':'none';
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONNECTION MODE
+// ═══════════════════════════════════════════════════════════
+let connMode=false, connFirst=null;
+
+function startConnMode(){
+  connMode=true; connFirst=null;
+  document.getElementById('conn-banner').style.display='block';
+  document.getElementById('conn-banner').textContent='Modo conexión — tocá el primer elemento';
+  switchTab('mapa',document.querySelector('.tab[data-tab="mapa"]'));
+}
+
+function handleConnClick(id){
+  if(!connMode) return;
+  if(!connFirst){
+    connFirst=id;
+    const name=S.elems[id].name;
+    document.getElementById('conn-banner').textContent=`"${name}" → tocá el segundo elemento`;
+    return;
+  }
+  if(connFirst===id){ connFirst=null; document.getElementById('conn-banner').textContent='Tocá el primer elemento'; return; }
+
+  const a=S.elems[connFirst], b=S.elems[id];
+  // determine network
+  let net='elec';
+  const waterTypes=['tanque','llave_agua','bebedero'];
+  if(waterTypes.includes(a.type)||waterTypes.includes(b.type)) net='agua';
+  if(a.type==='potrero'||b.type==='potrero') net='both';
+
+  const dup=S.conns.find(c=>(c.from===connFirst&&c.to===id)||(c.from===id&&c.to===connFirst));
+  if(!dup){
+    S.conns.push({id:uid(),from:connFirst,to:id,net});
+    addHist('Config',`Conectó "${a.name}" ↔ "${b.name}"`,`Red: ${net}`);
+  }
+
+  connFirst=null;
+  document.getElementById('conn-banner').textContent='Modo conexión — tocá el primer elemento';
+  renderAll(); renderConfig(); save();
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ connMode=false; connFirst=null; document.getElementById('conn-banner').style.display='none'; }
+});
+
+// ═══════════════════════════════════════════════════════════
+// CONFIG RENDER
+// ═══════════════════════════════════════════════════════════
+function renderConfig(){
+  const elems=Object.values(S.elems);
+  document.getElementById('cfg-elem-count').textContent=elems.length;
+  document.getElementById('cfg-conn-count').textContent=S.conns.length;
+
+  const eDiv=document.getElementById('cfg-elem-list');
+  eDiv.innerHTML=elems.length
+    ? elems.map(el=>{
+        const ti=TYPES[el.type]||{ico:'?',lbl:el.type};
+        return `<div class="cfg-ei">
+          <span class="cfg-ei-ico">${ti.ico}</span>
+          <span class="cfg-ei-name" style="font-size:11px">${el.name} <span style="color:var(--text3);font-size:9px">[${ti.lbl}]</span></span>
+          <span class="cfg-ei-btns">
+            <button onclick="editElem('${el.id}')" title="Editar">✏️</button>
+            <button onclick="deleteElem('${el.id}')" title="Eliminar">🗑</button>
+          </span>
+        </div>`;
+      }).join('')
+    : '<div style="font-size:11px;color:var(--text3)">Sin elementos</div>';
+
+  const cDiv=document.getElementById('cfg-conn-list');
+  cDiv.innerHTML=S.conns.length
+    ? S.conns.map(c=>{
+        const a=S.elems[c.from], b=S.elems[c.to];
+        if(!a||!b) return '';
+        const ico=c.net==='agua'?'💧':c.net==='elec'?'⚡':'🔗';
+        return `<div class="cfg-ei">
+          <span>${ico}</span>
+          <span class="cfg-ei-name" style="font-size:10px">${a.name} ↔ ${b.name}</span>
+          <span class="cfg-ei-btns"><button onclick="deleteConn('${c.id}')">✕</button></span>
+        </div>`;
+      }).join('')
+    : '<div style="font-size:11px;color:var(--text3)">Sin conexiones</div>';
+}
+
+function deleteConn(id){
+  S.conns=S.conns.filter(c=>c.id!==id);
+  renderAll(); renderConfig(); save();
+}
+
+// ═══════════════════════════════════════════════════════════
+// PERSISTENCE
+// ═══════════════════════════════════════════════════════════
+const LS_KEY='mhe_v1';
+
+function save(){
+  try{
+    localStorage.setItem(LS_KEY,JSON.stringify({
+      elems:S.elems, conns:S.conns, hist:S.hist
+    }));
+  }catch(e){}
+}
+
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem(LS_KEY)||'{}');
+    if(d.elems) S.elems=d.elems;
+    if(d.conns) S.conns=d.conns;
+    if(d.hist)  S.hist=d.hist;
+  }catch(e){}
+}
+
+function exportJSON(){
+  const blob=new Blob([JSON.stringify({elems:S.elems,conns:S.conns,hist:S.hist},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`monitor_infra_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+async function importJSON(inp){
+  const f=inp.files[0]; if(!f) return;
+  try{
+    const d=JSON.parse(await f.text());
+    if(d.elems) S.elems=d.elems;
+    if(d.conns) S.conns=d.conns;
+    if(d.hist)  S.hist=d.hist;
+    renderAll(); save();
+    alert('Datos importados correctamente.');
+  }catch(e){ alert('Error al leer el JSON: '+e.message); }
+  inp.value='';
+}
+
+function resetAll(){
+  if(!confirm('¿Borrar TODOS los elementos, conexiones e historial? Esta acción no se puede deshacer.')) return;
+  S.elems={}; S.conns=[]; S.hist=[];
+  baseLayer.clearLayers(); elemLayer.clearLayers();
+  renderAll(); renderConfig(); save();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODAL HELPERS
+// ═══════════════════════════════════════════════════════════
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+load();
+renderAll();
+</script>
+</body>
+</html>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('SW registrado:', r.scope))
+      .catch(e => console.warn('SW error:', e));
+  });
+}
+</script>
