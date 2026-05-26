@@ -453,7 +453,8 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
 
         <div class="cfg-sect">
           <h4>➕ Elementos</h4>
-          <button class="cbtn cbtn-primary" onclick="showAddElem()">+ Nuevo elemento manual</button>
+          <button class="cbtn cbtn-primary" onclick="startAddMode()">📍 Agregar tocando el mapa</button>
+          <button class="cbtn" onclick="showAddElem(null)">+ Nuevo elemento manual</button>
           <button class="cbtn" onclick="startConnMode()">🔗 Conectar dos elementos</button>
         </div>
 
@@ -1021,13 +1022,15 @@ function clearHistory(){
 // ═══════════════════════════════════════════════════════════
 // ELEMENTS — ADD / EDIT / DELETE
 // ═══════════════════════════════════════════════════════════
-function showAddElem(){
+function showAddElem(latlng){
   document.getElementById('m-elem-title').textContent='NUEVO ELEMENTO';
   document.getElementById('e-id').value='';
   document.getElementById('e-name').value='';
   document.getElementById('e-type').value='llave_elec';
   document.getElementById('e-sistema').value='1';
   document.getElementById('e-estado').value='1';
+  // store coords for saveElem
+  document._pendingLatLng = latlng || null;
   onETypeChange();
   document.getElementById('m-elem').classList.add('open');
 }
@@ -1050,11 +1053,16 @@ function saveElem(){
   const on=document.getElementById('e-estado').value==='1';
   if(!name){ alert('Ingrese un nombre'); return; }
   const existing=S.elems[id];
+  const ll=document._pendingLatLng;
+  const defaultGeom=ll
+    ? {type:'Point', lat:ll.lat, lng:ll.lng}
+    : {type:'Point', lat:map.getCenter().lat, lng:map.getCenter().lng};
   S.elems[id]={
     id,type,name,sistema:sist,on,
-    geom:existing?.geom||{type:'Point',lat:map.getCenter().lat,lng:map.getCenter().lng},
+    geom:existing?.geom||defaultGeom,
     fromKMZ:existing?.fromKMZ||false
   };
+  document._pendingLatLng=null;
   closeModal('m-elem');
   renderAll(); save();
 }
@@ -1071,14 +1079,69 @@ function onETypeChange(){
 }
 
 // ═══════════════════════════════════════════════════════════
+// MAP CLICK — agregar / mover
+// ═══════════════════════════════════════════════════════════
+let addMode=false, moveMode=false, moveElemId=null;
+
+function setBanner(txt, color){
+  const b=document.getElementById('conn-banner');
+  b.style.display=txt?'block':'none';
+  b.style.background=color||'var(--amber)';
+  b.style.color=color?'#fff':'#1a0a00';
+  if(txt) b.textContent=txt;
+}
+
+function exitAllModes(){
+  connMode=false; connFirst=null;
+  addMode=false;
+  moveMode=false; moveElemId=null;
+  setBanner(null);
+}
+
+map.on('click', function(e){
+  if(addMode){
+    addMode=false; setBanner(null);
+    showAddElem(e.latlng);
+    return;
+  }
+  if(moveMode && moveElemId){
+    const el=S.elems[moveElemId];
+    if(el){
+      el.geom.lat=e.latlng.lat;
+      el.geom.lng=e.latlng.lng;
+      // si tiene polígono, solo actualizamos el centroide (el polígono queda del KMZ)
+      addHist('Config',`Movió "${el.name}" a nueva posición`);
+      renderAll(); renderConfig(); save();
+    }
+    moveMode=false; moveElemId=null; setBanner(null);
+    return;
+  }
+});
+
+function startAddMode(){
+  exitAllModes();
+  addMode=true;
+  setBanner('📍 Tocá el mapa donde querés agregar el elemento','#1a6b2a');
+  switchTab('mapa',document.querySelector('.tab[data-tab="mapa"]'));
+}
+
+function startMoveMode(id){
+  exitAllModes();
+  moveMode=true; moveElemId=id;
+  const name=S.elems[id]?.name||'elemento';
+  setBanner(`📍 Tocá el nuevo lugar de "${name}" en el mapa`,'#1a3a6b');
+  switchTab('mapa',document.querySelector('.tab[data-tab="mapa"]'));
+}
+
+// ═══════════════════════════════════════════════════════════
 // CONNECTION MODE
 // ═══════════════════════════════════════════════════════════
 let connMode=false, connFirst=null;
 
 function startConnMode(){
+  exitAllModes();
   connMode=true; connFirst=null;
-  document.getElementById('conn-banner').style.display='block';
-  document.getElementById('conn-banner').textContent='Modo conexión — tocá el primer elemento';
+  setBanner('Modo conexión — tocá el primer elemento');
   switchTab('mapa',document.querySelector('.tab[data-tab="mapa"]'));
 }
 
@@ -1087,13 +1150,12 @@ function handleConnClick(id){
   if(!connFirst){
     connFirst=id;
     const name=S.elems[id].name;
-    document.getElementById('conn-banner').textContent=`"${name}" → tocá el segundo elemento`;
+    setBanner(`"${name}" → tocá el segundo elemento`);
     return;
   }
-  if(connFirst===id){ connFirst=null; document.getElementById('conn-banner').textContent='Tocá el primer elemento'; return; }
+  if(connFirst===id){ connFirst=null; setBanner('Modo conexión — tocá el primer elemento'); return; }
 
   const a=S.elems[connFirst], b=S.elems[id];
-  // determine network
   let net='elec';
   const waterTypes=['tanque','llave_agua','bebedero'];
   if(waterTypes.includes(a.type)||waterTypes.includes(b.type)) net='agua';
@@ -1106,12 +1168,12 @@ function handleConnClick(id){
   }
 
   connFirst=null;
-  document.getElementById('conn-banner').textContent='Modo conexión — tocá el primer elemento';
+  setBanner('Modo conexión — tocá el primer elemento');
   renderAll(); renderConfig(); save();
 }
 
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){ connMode=false; connFirst=null; document.getElementById('conn-banner').style.display='none'; }
+  if(e.key==='Escape') exitAllModes();
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -1131,6 +1193,7 @@ function renderConfig(){
           <span class="cfg-ei-name" style="font-size:11px">${el.name} <span style="color:var(--text3);font-size:9px">[${ti.lbl}]</span></span>
           <span class="cfg-ei-btns">
             <button onclick="editElem('${el.id}')" title="Editar">✏️</button>
+            <button onclick="startMoveMode('${el.id}')" title="Mover en mapa">📍</button>
             <button onclick="deleteElem('${el.id}')" title="Eliminar">🗑</button>
           </span>
         </div>`;
