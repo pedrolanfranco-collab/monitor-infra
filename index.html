@@ -366,6 +366,45 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
 }
 #draw-btn:hover{background:var(--surface2);border-color:var(--amber);}
 #draw-btn.active{background:rgba(255,179,0,.15);border-color:var(--amber);}
+#gps-btn{
+  position:absolute;top:170px;left:10px;z-index:1000;
+  background:rgba(13,31,15,.95);backdrop-filter:blur(4px);
+  border:1px solid var(--border2);border-radius:6px;
+  padding:7px 12px;
+  font-family:var(--cond);font-size:12px;font-weight:700;
+  color:var(--cyan);cursor:pointer;
+  transition:all .2s;letter-spacing:.5px;
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
+}
+#gps-btn:hover{background:var(--surface2);border-color:var(--cyan);}
+#gps-btn.active{background:rgba(38,198,218,.15);border-color:var(--cyan);}
+#gps-info{
+  display:none;
+  position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  z-index:1000;
+  background:rgba(13,31,15,.96);backdrop-filter:blur(6px);
+  border:1px solid var(--border2);border-radius:8px;
+  padding:10px 16px;min-width:220px;max-width:320px;
+  box-shadow:0 4px 20px rgba(0,0,0,.5);
+  font-family:var(--sans);
+}
+#gps-info .gi-title{
+  font-family:var(--cond);font-size:11px;font-weight:700;
+  letter-spacing:1px;color:var(--cyan);text-transform:uppercase;
+  margin-bottom:6px;
+}
+#gps-info .gi-name{
+  font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;
+}
+#gps-info .gi-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+#gps-info .gi-coords{
+  font-family:var(--mono);font-size:9px;color:var(--text3);
+}
+#gps-info .gi-close{
+  position:absolute;top:8px;right:10px;
+  background:transparent;border:none;color:var(--text2);
+  cursor:pointer;font-size:14px;
+}
 
 /* ── LAYER CONTROL (Leaflet) ── */
 #map-legend{
@@ -422,6 +461,8 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
     <div id="conn-banner">Modo conexión — tocá el primer elemento</div>
     <button id="layer-toggle" onclick="toggleLayer()" title="Cambiar fondo del mapa">🛰 Satelital</button>
     <button id="draw-btn" onclick="startDraw()" title="Dibujar nuevo polígono">✏️ Dibujar potrero</button>
+    <button id="gps-btn" onclick="locateMe()" title="Mi ubicación GPS">📍 Mi ubicación</button>
+    <div id="gps-info"></div>
     <div id="map-legend">
       <div class="leg-row"><div class="leg-dot" style="background:#4caf50"></div>Potrero OK</div>
       <div class="leg-row"><div class="leg-dot" style="background:#ef5350"></div>Sin servicio</div>
@@ -1190,7 +1231,140 @@ map.on(L.Draw.Event.DRAWSTOP, function(){
 });
 
 // ═══════════════════════════════════════════════════════════
-// MAP CLICK — agregar / mover
+// GPS — UBICACIÓN Y DETECCIÓN DE POTRERO
+// ═══════════════════════════════════════════════════════════
+let gpsMarker = null;
+let gpsCircle = null;
+let gpsWatchId = null;
+
+function locateMe(){
+  const btn = document.getElementById('gps-btn');
+  if(!navigator.geolocation){
+    alert('Tu dispositivo no soporta GPS'); return;
+  }
+  if(gpsWatchId !== null){
+    // apagar GPS
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+    if(gpsMarker){ map.removeLayer(gpsMarker); gpsMarker=null; }
+    if(gpsCircle){ map.removeLayer(gpsCircle); gpsCircle=null; }
+    btn.textContent='📍 Mi ubicación';
+    btn.classList.remove('active');
+    document.getElementById('gps-info').style.display='none';
+    return;
+  }
+  btn.textContent='⏳ Buscando...';
+  btn.classList.add('active');
+
+  gpsWatchId = navigator.geolocation.watchPosition(
+    pos => onGPS(pos),
+    err => {
+      btn.textContent='📍 Mi ubicación';
+      btn.classList.remove('active');
+      gpsWatchId=null;
+      alert('No se pudo obtener ubicación GPS. Verificá que el permiso esté habilitado.');
+    },
+    { enableHighAccuracy:true, maximumAge:5000, timeout:15000 }
+  );
+}
+
+function onGPS(pos){
+  const lat=pos.coords.latitude, lng=pos.coords.longitude;
+  const acc=pos.coords.accuracy;
+  const btn=document.getElementById('gps-btn');
+  btn.textContent='📍 GPS activo';
+
+  // Actualizar marcador
+  if(!gpsMarker){
+    gpsMarker=L.circleMarker([lat,lng],{
+      radius:8,color:'#26c6da',fillColor:'#26c6da',
+      weight:3,fillOpacity:0.9,zIndexOffset:1000
+    }).bindTooltip('Tu ubicación',{permanent:false}).addTo(map);
+    map.setView([lat,lng],16);
+  } else {
+    gpsMarker.setLatLng([lat,lng]);
+  }
+  if(gpsCircle){ map.removeLayer(gpsCircle); }
+  if(acc<200){
+    gpsCircle=L.circle([lat,lng],{
+      radius:acc,color:'#26c6da',fillColor:'#26c6da',
+      weight:1,fillOpacity:0.08
+    }).addTo(map);
+  }
+
+  // Detectar en qué potrero estás
+  detectPotrero(lat, lng, acc);
+}
+
+function pointInPolygon(lat, lng, coords){
+  // Ray casting algorithm
+  let inside=false;
+  for(let i=0,j=coords.length-1; i<coords.length; j=i++){
+    const xi=coords[i][0], yi=coords[i][1];
+    const xj=coords[j][0], yj=coords[j][1];
+    const intersect=((yi>lng)!==(yj>lng))&&(lat<(xj-xi)*(lng-yi)/(yj-yi)+xi);
+    if(intersect) inside=!inside;
+  }
+  return inside;
+}
+
+function distToPoint(lat,lng,plat,plng){
+  const R=6371000;
+  const dLat=(plat-lat)*Math.PI/180;
+  const dLng=(plng-lng)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat*Math.PI/180)*Math.cos(plat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function detectPotrero(lat, lng, acc){
+  const {energized, watered} = calcStates();
+  const potreros = Object.values(S.elems).filter(e=>e.type==='potrero');
+  const info = document.getElementById('gps-info');
+
+  // Buscar potrero que contenga el punto (si tiene polígono)
+  let encontrado = null;
+  for(const p of potreros){
+    if(p.geom.type==='Polygon' && pointInPolygon(lat, lng, p.geom.coords)){
+      encontrado=p; break;
+    }
+  }
+
+  // Si no hay polígono, buscar el más cercano por centroide (dentro de 300m)
+  if(!encontrado){
+    let minDist=300, nearest=null;
+    for(const p of potreros){
+      const d=distToPoint(lat,lng,p.geom.lat,p.geom.lng);
+      if(d<minDist){ minDist=d; nearest=p; }
+    }
+    if(nearest) encontrado=nearest;
+  }
+
+  if(!encontrado){
+    info.style.display='block';
+    info.innerHTML=`
+      <button class="gi-close" onclick="document.getElementById('gps-info').style.display='none'">✕</button>
+      <div class="gi-title">📍 Tu ubicación</div>
+      <div class="gi-name" style="color:var(--text2)">Fuera de potreros configurados</div>
+      <div class="gi-coords">lat:${lat.toFixed(6)} lng:${lng.toFixed(6)} · ±${Math.round(acc)}m</div>`;
+    return;
+  }
+
+  const hE=energized.has(encontrado.id);
+  const hW=watered.has(encontrado.id);
+  const avail=hE&&hW;
+
+  info.style.display='block';
+  info.innerHTML=`
+    <button class="gi-close" onclick="document.getElementById('gps-info').style.display='none'">✕</button>
+    <div class="gi-title">📍 Estás en</div>
+    <div class="gi-name">${encontrado.name}</div>
+    <div class="gi-pills">
+      <span class="pill ${hE?'pill-ok':'pill-nok'}">⚡ ${hE?'ENERGIZADO':'SIN ENERGÍA'}</span>
+      <span class="pill ${hW?'pill-ok':'pill-nok'}">💧 ${hW?'CON AGUA':'SIN AGUA'}</span>
+      <span class="pill ${avail?'pill-ok':'pill-nok'}">${avail?'✅ DISPONIBLE':'⚠ NO DISPONIBLE'}</span>
+    </div>
+    <div class="gi-coords">lat:${lat.toFixed(6)} lng:${lng.toFixed(6)} · ±${Math.round(acc)}m</div>`;
+}
 // ═══════════════════════════════════════════════════════════
 let addMode=false, moveMode=false, moveElemId=null;
 
