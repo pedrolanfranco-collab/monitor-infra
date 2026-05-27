@@ -344,23 +344,25 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
 
 /* ── LAYER TOGGLE ── */
 #layer-toggle{
-  position:absolute;bottom:24px;right:10px;z-index:400;
-  background:rgba(13,31,15,.9);backdrop-filter:blur(4px);
+  position:absolute;top:90px;left:10px;z-index:1000;
+  background:rgba(13,31,15,.95);backdrop-filter:blur(4px);
   border:1px solid var(--border2);border-radius:6px;
   padding:7px 12px;
   font-family:var(--cond);font-size:12px;font-weight:700;
   color:var(--green2);cursor:pointer;
   transition:all .2s;letter-spacing:.5px;
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
 }
 #layer-toggle:hover{background:var(--surface2);border-color:var(--green2);}
 #draw-btn{
-  position:absolute;bottom:60px;right:10px;z-index:400;
-  background:rgba(13,31,15,.9);backdrop-filter:blur(4px);
+  position:absolute;top:130px;left:10px;z-index:1000;
+  background:rgba(13,31,15,.95);backdrop-filter:blur(4px);
   border:1px solid var(--border2);border-radius:6px;
   padding:7px 12px;
   font-family:var(--cond);font-size:12px;font-weight:700;
   color:var(--amber);cursor:pointer;
   transition:all .2s;letter-spacing:.5px;
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
 }
 #draw-btn:hover{background:var(--surface2);border-color:var(--amber);}
 #draw-btn.active{background:rgba(255,179,0,.15);border-color:var(--amber);}
@@ -634,11 +636,6 @@ const layerSatelital = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/
   attribution:'© Esri, Maxar, Earthstar Geographics', maxZoom:20
 });
 layerSatelital.addTo(map);
-L.control.layers(
-  { '🛰 Satelital': layerSatelital, '🗺 Calles': layerCalles },
-  {},
-  { position:'topleft', collapsed:false }
-).addTo(map);
 const baseLayer = L.layerGroup().addTo(map);
 const elemLayer = L.layerGroup().addTo(map);
 
