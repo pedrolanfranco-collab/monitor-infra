@@ -438,7 +438,7 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
   <div id="hdr-brand">
     <div>
       <div class="logo">⚡💧 INFRAESTRUCTURA</div>
-      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v11</div>
+      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v12</div>
     </div>
   </div>
   <div id="tabs">
@@ -466,8 +466,10 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
     <div id="map-legend">
       <div class="leg-row"><div class="leg-dot" style="background:#4caf50"></div>Potrero OK</div>
       <div class="leg-row"><div class="leg-dot" style="background:#ef5350"></div>Sin servicio</div>
-      <div class="leg-row"><div class="leg-dot" style="background:#ffb300"></div>Parcial</div>
-      <div class="leg-row"><div class="leg-dot" style="background:#42a5f5"></div>Agua</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#ffb300"></div>Parcial / Eléctrico</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#1565c0"></div>Tanque</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#42a5f5"></div>Llave de agua</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#26c6da"></div>Bebedero</div>
     </div>
   </div>
 
@@ -969,7 +971,19 @@ function renderMap(energized,watered){
 
     let fillColor=ti.color;
     let fillOpacity=el.on?0.85:0.25;
-    let radius=el.type==='potrero'?11:7;
+
+    // Tamaño y color por tipo
+    const MARKER_STYLE = {
+      potrero:     { radius:11, color:'#4caf50' },
+      energizador: { radius:9,  color:'#ffb300' },
+      llave_elec:  { radius:7,  color:'#ffb300' },
+      tanque:      { radius:8,  color:'#1565c0' },  // azul oscuro
+      llave_agua:  { radius:7,  color:'#42a5f5' },  // azul claro
+      bebedero:    { radius:5,  color:'#26c6da' },  // cyan pequeño
+    };
+    const ms = MARKER_STYLE[el.type] || { radius:7, color:ti.color };
+    let radius = ms.radius;
+    fillColor = ms.color;
 
     if(el.type==='potrero'){
       const hE=energized.has(el.id), hW=watered.has(el.id);
