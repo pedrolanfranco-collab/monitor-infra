@@ -1395,18 +1395,18 @@ load();
 renderAll();
 
 // Centrar en los elementos guardados al iniciar
-(function centerOnLoad(){
+setTimeout(function centerOnLoad(){
   const pts = Object.values(S.elems).filter(e => e.geom);
   if(pts.length){
     const lats = pts.map(e => e.geom.lat);
     const lngs = pts.map(e => e.geom.lng);
     const bounds = L.latLngBounds(
-      [Math.min(...lats)-0.002, Math.min(...lngs)-0.002],
-      [Math.max(...lats)+0.002, Math.max(...lngs)+0.002]
+      [Math.min(...lats)-0.005, Math.min(...lngs)-0.005],
+      [Math.max(...lats)+0.005, Math.max(...lngs)+0.005]
     );
-    map.fitBounds(bounds, {padding:[40,40]});
+    if(bounds.isValid()) map.fitBounds(bounds, {padding:[40,40]});
   }
-})();
+}, 300);
 </script>
 </body>
 </html>
