@@ -438,7 +438,7 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
   <div id="hdr-brand">
     <div>
       <div class="logo">⚡💧 INFRAESTRUCTURA</div>
-      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO</div>
+      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v11</div>
     </div>
   </div>
   <div id="tabs">
@@ -589,6 +589,7 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
     </select>
     <div class="mactions">
       <button class="m-cancel" onclick="closeModal('m-elem')">Cancelar</button>
+      <button id="m-elem-delete" class="m-danger" onclick="deleteElemFromModal()" style="display:none">🗑 Eliminar</button>
       <button class="m-confirm" onclick="saveElem()">Guardar</button>
     </div>
   </div>
@@ -1107,7 +1108,7 @@ function showAddElem(latlng){
   document.getElementById('e-type').value='llave_elec';
   document.getElementById('e-sistema').value='1';
   document.getElementById('e-estado').value='1';
-  // store coords for saveElem
+  document.getElementById('m-elem-delete').style.display='none';
   document._pendingLatLng = latlng || null;
   onETypeChange();
   document.getElementById('m-elem').classList.add('open');
@@ -1120,8 +1121,18 @@ function editElem(id){
   document.getElementById('e-type').value=el.type;
   document.getElementById('e-sistema').value=el.sistema||1;
   document.getElementById('e-estado').value=el.on?'1':'0';
+  document.getElementById('m-elem-delete').style.display='block';
   onETypeChange();
   document.getElementById('m-elem').classList.add('open');
+}
+function deleteElemFromModal(){
+  const id=document.getElementById('e-id').value;
+  if(!id) return;
+  if(!confirm('¿Eliminar este elemento y sus conexiones?')) return;
+  delete S.elems[id];
+  S.conns=S.conns.filter(c=>c.from!==id&&c.to!==id);
+  closeModal('m-elem');
+  renderAll(); renderConfig(); save();
 }
 function saveElem(){
   const id=document.getElementById('e-id').value||uid();
