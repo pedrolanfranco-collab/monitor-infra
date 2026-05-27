@@ -1,4 +1,4 @@
-const CACHE = 'monitor-infra-v2';
+const CACHE = 'monitor-infra-v3';
 const ASSETS = [
   './',
   './index.html',
