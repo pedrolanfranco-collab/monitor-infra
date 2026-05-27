@@ -600,9 +600,18 @@ let S = { elems:{}, conns:[], hist:[], pendingFeats:[], featIdx:0 };
 // MAP
 // ═══════════════════════════════════════════════════════════
 const map = L.map('map',{zoomControl:true}).setView([-33.0,-56.0],11);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  attribution:'© OpenStreetMap',maxZoom:20
-}).addTo(map);
+const layerCalles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap', maxZoom:20
+});
+const layerSatelital = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+  attribution:'© Esri, Maxar, Earthstar Geographics', maxZoom:20
+});
+layerSatelital.addTo(map);
+L.control.layers(
+  { '🛰 Satelital': layerSatelital, '🗺 Calles': layerCalles },
+  {},
+  { position:'topright', collapsed:false }
+).addTo(map);
 const baseLayer = L.layerGroup().addTo(map);
 const elemLayer = L.layerGroup().addTo(map);
 
