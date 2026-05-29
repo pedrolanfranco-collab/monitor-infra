@@ -11,7 +11,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap');
 
@@ -438,7 +437,7 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
   <div id="hdr-brand">
     <div>
       <div class="logo">⚡💧 INFRAESTRUCTURA</div>
-      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v15</div>
+      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v16</div>
     </div>
   </div>
   <div id="tabs">
@@ -657,7 +656,6 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
 
 <!-- SCRIPTS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
@@ -1207,13 +1205,17 @@ function toggleLayer(){
 }
 
 // ═══════════════════════════════════════════════════════════
-// DRAW POLYGON
+// DRAW POLYGON — implementación propia sin librería externa
 // ═══════════════════════════════════════════════════════════
-const drawnItems = new L.FeatureGroup().addTo(map);
-let drawHandler = null;
+let drawMode = false;
+let drawPoints = [];
+let drawPolyline = null;
+let drawMarkers = [];
+let drawPreview = null;
 let pendingDrawGeom = null;
 
 function startDraw(){
+  if(drawMode){ cancelDraw(); return; }
   exitAllModes();
   // Suspender GPS durante el dibujo
   if(gpsWatchId !== null){
@@ -1222,58 +1224,108 @@ function startDraw(){
     document.getElementById('gps-btn').textContent='📍 Mi ubicación';
     document.getElementById('gps-btn').classList.remove('active');
   }
+  drawMode = true;
+  drawPoints = [];
   const btn = document.getElementById('draw-btn');
-  if(drawHandler){
-    drawHandler.disable();
-    drawHandler = null;
-    btn.textContent = '✏️ Dibujar potrero';
-    btn.classList.remove('active');
-    return;
-  }
   btn.textContent = '⏹ Cancelar dibujo';
   btn.classList.add('active');
-  setBanner('Hacé clic en el mapa para trazar el polígono — doble clic para terminar','#4a2a00');
-
-  drawHandler = new L.Draw.Polygon(map, {
-    shapeOptions:{ color:'#ffb300', fillColor:'#ffb300', fillOpacity:0.2, weight:2 },
-    showArea: false,
-    allowIntersection: false
-  });
-  drawHandler.enable();
+  setBanner('Tocá el mapa para agregar vértices — doble clic o tocá el primer punto para cerrar','#1a3a0a');
+  map.getContainer().style.cursor = 'crosshair';
 }
 
-map.on(L.Draw.Event.CREATED, function(e){
-  const layer = e.layer;
-  const latlngs = layer.getLatLngs()[0];
-  const coords = latlngs.map(p => [p.lat, p.lng]);
-  const lat = coords.reduce((s,c)=>s+c[0],0)/coords.length;
-  const lng = coords.reduce((s,c)=>s+c[1],0)/coords.length;
-
-  pendingDrawGeom = { type:'Polygon', coords, lat, lng };
-
-  // reset draw button
-  drawHandler = null;
+function cancelDraw(){
+  drawMode = false;
+  drawPoints = [];
+  drawMarkers.forEach(m => map.removeLayer(m));
+  drawMarkers = [];
+  if(drawPolyline){ map.removeLayer(drawPolyline); drawPolyline=null; }
+  if(drawPreview){ map.removeLayer(drawPreview); drawPreview=null; }
   document.getElementById('draw-btn').textContent = '✏️ Dibujar potrero';
   document.getElementById('draw-btn').classList.remove('active');
   setBanner(null);
+  map.getContainer().style.cursor = '';
+}
 
-  // open add modal pre-filled as potrero
+function finishDraw(){
+  if(drawPoints.length < 3){ alert('Necesitás al menos 3 puntos para crear un polígono'); return; }
+  const coords = drawPoints.map(p => [p.lat, p.lng]);
+  const lat = coords.reduce((s,c)=>s+c[0],0)/coords.length;
+  const lng = coords.reduce((s,c)=>s+c[1],0)/coords.length;
+  pendingDrawGeom = { type:'Polygon', coords, lat, lng };
+  cancelDraw();
+
   document.getElementById('m-elem-title').textContent = 'NUEVO ELEMENTO DIBUJADO';
   document.getElementById('e-id').value = '';
   document.getElementById('e-name').value = '';
   document.getElementById('e-type').value = 'potrero';
   document.getElementById('e-sistema').value = '1';
   document.getElementById('e-estado').value = '1';
+  document.getElementById('m-elem-delete').style.display = 'none';
   document._pendingLatLng = null;
   onETypeChange();
   document.getElementById('m-elem').classList.add('open');
+}
+
+map.on('click', function(e){
+  if(!drawMode) {
+    // otros modos
+    if(addMode){
+      addMode=false; setBanner(null);
+      showAddElem(e.latlng);
+      return;
+    }
+    if(moveMode && moveElemId){
+      const el=S.elems[moveElemId];
+      if(el){
+        el.geom.lat=e.latlng.lat;
+        el.geom.lng=e.latlng.lng;
+        addHist('Config',`Movió "${el.name}" a nueva posición`);
+        renderAll(); renderConfig(); save();
+      }
+      moveMode=false; moveElemId=null; setBanner(null);
+    }
+    return;
+  }
+
+  // Modo dibujo — agregar punto
+  const pt = e.latlng;
+
+  // Si tocó cerca del primer punto → cerrar polígono
+  if(drawPoints.length >= 3){
+    const first = drawPoints[0];
+    const dist = map.distance(pt, L.latLng(first.lat, first.lng));
+    if(dist < 20){ finishDraw(); return; }
+  }
+
+  drawPoints.push({lat: pt.lat, lng: pt.lng});
+
+  // Marcador de vértice
+  const vm = L.circleMarker(pt, {
+    radius:5, color:'#ffb300', fillColor:'#ffb300',
+    weight:2, fillOpacity:1, zIndexOffset:500
+  }).addTo(map);
+  drawMarkers.push(vm);
+
+  // Actualizar línea y preview
+  if(drawPolyline) map.removeLayer(drawPolyline);
+  if(drawPreview)  map.removeLayer(drawPreview);
+
+  if(drawPoints.length >= 2){
+    const lls = drawPoints.map(p => [p.lat, p.lng]);
+    drawPolyline = L.polyline(lls, {color:'#ffb300', weight:2, dashArray:'6 4'}).addTo(map);
+  }
+  if(drawPoints.length >= 3){
+    const lls = drawPoints.map(p => [p.lat, p.lng]);
+    drawPreview = L.polygon(lls, {color:'#ffb300', fillColor:'#ffb300', weight:1.5, fillOpacity:0.15}).addTo(map);
+  }
+
+  setBanner(`${drawPoints.length} vértices — tocá el primer punto o doble clic para cerrar`, '#1a3a0a');
 });
 
-map.on(L.Draw.Event.DRAWSTOP, function(){
-  if(drawHandler){ drawHandler=null; }
-  document.getElementById('draw-btn').textContent = '✏️ Dibujar potrero';
-  document.getElementById('draw-btn').classList.remove('active');
-  setBanner(null);
+map.on('dblclick', function(e){
+  if(!drawMode) return;
+  L.DomEvent.stop(e);
+  finishDraw();
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -1426,31 +1478,9 @@ function exitAllModes(){
   connMode=false; connFirst=null;
   addMode=false;
   moveMode=false; moveElemId=null;
+  if(drawMode) cancelDraw();
   setBanner(null);
 }
-
-map.on('click', function(e){
-  // Ignorar clicks del mapa si Leaflet.draw está activo
-  if(drawHandler) return;
-
-  if(addMode){
-    addMode=false; setBanner(null);
-    showAddElem(e.latlng);
-    return;
-  }
-  if(moveMode && moveElemId){
-    const el=S.elems[moveElemId];
-    if(el){
-      el.geom.lat=e.latlng.lat;
-      el.geom.lng=e.latlng.lng;
-      // si tiene polígono, solo actualizamos el centroide (el polígono queda del KMZ)
-      addHist('Config',`Movió "${el.name}" a nueva posición`);
-      renderAll(); renderConfig(); save();
-    }
-    moveMode=false; moveElemId=null; setBanner(null);
-    return;
-  }
-});
 
 function startAddMode(){
   exitAllModes();
