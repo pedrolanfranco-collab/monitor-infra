@@ -438,7 +438,7 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
   <div id="hdr-brand">
     <div>
       <div class="logo">⚡💧 INFRAESTRUCTURA</div>
-      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v14</div>
+      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v15</div>
     </div>
   </div>
   <div id="tabs">
@@ -1215,6 +1215,13 @@ let pendingDrawGeom = null;
 
 function startDraw(){
   exitAllModes();
+  // Suspender GPS durante el dibujo
+  if(gpsWatchId !== null){
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+    document.getElementById('gps-btn').textContent='📍 Mi ubicación';
+    document.getElementById('gps-btn').classList.remove('active');
+  }
   const btn = document.getElementById('draw-btn');
   if(drawHandler){
     drawHandler.disable();
@@ -1423,6 +1430,9 @@ function exitAllModes(){
 }
 
 map.on('click', function(e){
+  // Ignorar clicks del mapa si Leaflet.draw está activo
+  if(drawHandler) return;
+
   if(addMode){
     addMode=false; setBanner(null);
     showAddElem(e.latlng);
