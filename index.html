@@ -136,6 +136,9 @@ body{display:flex;flex-direction:column}
 .cei-n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cei button{background:transparent;border:none;cursor:pointer;font-size:11px;padding:2px 3px;opacity:.6;transition:opacity .15s}
 .cei button:hover{opacity:1}
+.cf-btn{padding:3px 8px;border-radius:3px;border:1px solid var(--brd2);background:var(--surf2);color:var(--txt2);font-family:var(--cond);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s}
+.cf-btn:hover{border-color:var(--green2);color:var(--txt)}
+.cf-btn.active{background:var(--surf3);border-color:var(--green2);color:var(--green2)}
 
 /* EMPTY */
 .es{padding:24px 12px;text-align:center;font-family:var(--cond);font-size:11px;color:var(--txt3);line-height:1.6}
@@ -258,7 +261,21 @@ body{display:flex;flex-direction:column}
           <button class="cb" onclick="startConn()">🔗 Conectar dos elementos</button>
         </div>
         <div class="cs"><h4>📦 Elementos (<span id="cfg-ec">0</span>)</h4><div id="cfg-el"><div style="font-size:11px;color:var(--txt3)">Sin elementos</div></div></div>
-        <div class="cs"><h4>🔗 Conexiones (<span id="cfg-cc">0</span>)</h4><div id="cfg-cl"><div style="font-size:11px;color:var(--txt3)">Sin conexiones</div></div></div>
+        <div class="cs">
+          <h4>🔗 Conexiones (<span id="cfg-cc">0</span>)
+            <button onclick="delAllConns()" style="float:right;background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">[borrar todas]</button>
+          </h4>
+          <div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap">
+            <button class="cf-btn active" id="cf-all" onclick="setConnFilter('all',this)">Todas</button>
+            <button class="cf-btn" id="cf-elec" onclick="setConnFilter('elec',this)">⚡ Eléc</button>
+            <button class="cf-btn" id="cf-agua" onclick="setConnFilter('agua',this)">💧 Agua</button>
+            <button class="cf-btn" id="cf-s1" onclick="setConnFilter('s1',this)">S1</button>
+            <button class="cf-btn" id="cf-s2" onclick="setConnFilter('s2',this)">S2</button>
+            <button class="cf-btn" id="cf-s3" onclick="setConnFilter('s3',this)">S3</button>
+            <button class="cf-btn" id="cf-s4" onclick="setConnFilter('s4',this)">S4</button>
+          </div>
+          <div id="cfg-cl"><div style="font-size:11px;color:var(--txt3)">Sin conexiones</div></div>
+        </div>
         <div class="cs"><h4>💾 Datos</h4>
           <button class="cb" onclick="exportJSON()">↓ Exportar JSON</button>
           <button class="cb" onclick="document.getElementById('fi-json').click()">↑ Importar JSON</button>
@@ -669,11 +686,114 @@ function renderCfg(){
     <span class="cei-n">${e.name} <span style="color:var(--txt3);font-size:9px">[${T[e.type]?.lbl||e.type}]</span></span>
     <span><button onclick="showEdit('${e.id}')">✏️</button><button onclick="startMove('${e.id}')">📍</button><button onclick="delElem('${e.id}')">🗑</button></span>
   </div>`).join(''):'<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';
-  document.getElementById('cfg-cl').innerHTML=S.conns.length?S.conns.map(c=>{
+  renderConnList();
+}
+
+let connFilter='all';
+
+function setConnFilter(f, btn){
+  connFilter=f;
+  document.querySelectorAll('.cf-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderConnList();
+  // Also highlight on map
+  renderAllWithFilter();
+}
+
+function renderConnList(){
+  const d=document.getElementById('cfg-cl');
+  if(!S.conns.length){d.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin conexiones</div>';return;}
+
+  const filtered=S.conns.filter(c=>{
+    if(connFilter==='all')return true;
+    if(connFilter==='elec')return c.net==='elec';
+    if(connFilter==='agua')return c.net==='agua';
+    if(connFilter==='s1')return connInSist(c,1);
+    if(connFilter==='s2')return connInSist(c,2);
+    if(connFilter==='s3')return connInSist(c,3);
+    if(connFilter==='s4')return connInSist(c,4);
+    return true;
+  });
+
+  if(!filtered.length){d.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin conexiones en este filtro</div>';return;}
+
+  d.innerHTML=filtered.map(c=>{
     const a=S.elems[c.from],b=S.elems[c.to];if(!a||!b)return'';
     const ico=c.net==='agua'?'💧':c.net==='elec'?'⚡':'🔗';
-    return `<div class="cei"><span>${ico}</span><span class="cei-n" style="font-size:10px">${a.name} ↔ ${b.name}</span><span><button onclick="delConn('${c.id}')">✕</button></span></div>`;
-  }).join(''):'<div style="font-size:11px;color:var(--txt3)">Sin conexiones</div>';
+    const sa=a.sistema?` S${a.sistema}`:'';
+    const sb=b.sistema?` S${b.sistema}`:'';
+    return `<div class="cei" style="align-items:flex-start;padding:5px 0">
+      <span style="flex-shrink:0;padding-top:1px">${ico}</span>
+      <div class="cei-n" style="font-size:10px;white-space:normal;line-height:1.4">
+        <span style="color:var(--txt)">${T[a.type]?.ico||''} ${a.name}</span><span style="color:var(--txt3)">${sa}</span>
+        <span style="color:var(--txt2)"> ↔ </span>
+        <span style="color:var(--txt)">${T[b.type]?.ico||''} ${b.name}</span><span style="color:var(--txt3)">${sb}</span>
+      </div>
+      <button onclick="delConn('${c.id}')" style="flex-shrink:0;background:transparent;border:none;color:var(--red);cursor:pointer;font-size:13px;padding:0 2px;opacity:.7" title="Eliminar">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function connInSist(c,s){
+  const a=S.elems[c.from],b=S.elems[c.to];
+  if(!a||!b)return false;
+  return a.sistema===s||b.sistema===s;
+}
+
+function delAllConns(){
+  const f=connFilter;
+  const toDelete=S.conns.filter(c=>{
+    if(f==='all')return true;
+    if(f==='elec')return c.net==='elec';
+    if(f==='agua')return c.net==='agua';
+    if(f==='s1')return connInSist(c,1);
+    if(f==='s2')return connInSist(c,2);
+    if(f==='s3')return connInSist(c,3);
+    if(f==='s4')return connInSist(c,4);
+    return false;
+  });
+  if(!toDelete.length)return;
+  const label=f==='all'?'TODAS las conexiones':`las conexiones del filtro "${f.toUpperCase()}"`;
+  if(!confirm(`¿Eliminar ${label}? (${toDelete.length} conexiones)`))return;
+  const ids=new Set(toDelete.map(c=>c.id));
+  S.conns=S.conns.filter(c=>!ids.has(c.id));
+  renderAll();renderCfg();save();
+}
+
+function renderAllWithFilter(){
+  const{energized,watered}=calcStates();
+  elemL.clearLayers();
+  // conexiones — highlight según filtro
+  S.conns.forEach(c=>{
+    const a=S.elems[c.from],b=S.elems[c.to];if(!a||!b)return;
+    const active=connFilter==='all'||
+      (connFilter==='elec'&&c.net==='elec')||
+      (connFilter==='agua'&&c.net==='agua')||
+      (connFilter==='s1'&&connInSist(c,1))||
+      (connFilter==='s2'&&connInSist(c,2))||
+      (connFilter==='s3'&&connInSist(c,3))||
+      (connFilter==='s4'&&connInSist(c,4));
+    const col=c.net==='agua'?'#42a5f5':c.net==='elec'?'#ffb300':'#555';
+    L.polyline([[a.geom.lat,a.geom.lng],[b.geom.lat,b.geom.lng]],{
+      color:active?col:'#333',weight:active?2:1,
+      opacity:active?0.8:0.15,dashArray:'5 5'
+    }).addTo(elemL);
+  });
+  // marcadores igual que antes
+  Object.values(S.elems).forEach(el=>{
+    const ti=T[el.type];if(!ti)return;
+    const ms=MS[el.type]||{r:7,c:'#888'};
+    let fc=ms.c,fo=el.on?0.85:0.25;
+    if(el.type==='potrero'){const hE=energized.has(el.id),hW=watered.has(el.id);fc=hE&&hW?'#4caf50':!hE&&!hW?'#ef5350':'#ffb300';fo=0.85;}
+    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:fc,fillColor:fc,weight:2,fillOpacity:0.15}).addTo(elemL);
+    const m=L.circleMarker([el.geom.lat,el.geom.lng],{radius:ms.r,color:fc,fillColor:fc,weight:2,fillOpacity:fo});
+    const vs=ti.valve?(el.on?' [ABIERTA]':' [CERRADA]'):'';
+    const ss=el.salidas?` · ${el.salidas} sal`:'';
+    m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
+    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(ti.valve)askTog(el.id);});
+    m.addTo(elemL);
+  });
+  renderLlaves(energized,watered);renderInfra();renderStats(energized,watered);updateHdr(energized,watered);
 }
 
 // ── ELEMENT CRUD ───────────────────────────────────────────
