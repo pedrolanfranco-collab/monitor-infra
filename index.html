@@ -181,7 +181,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v28</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v31</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -409,7 +409,7 @@ const T={
   bomba:       {ico:'🔧',lbl:'Bomba Eléc',    net:'both',valve:true},
   poste_t:     {ico:'⊤', lbl:'Poste T',       net:'elec'},
   poste_x:     {ico:'✚', lbl:'Poste Cruz',    net:'elec'},
-  bomba_solar: {ico:'🌞',lbl:'Bomba Solar',   net:'agua',src:true},
+  bomba_solar: {ico:'🌞',lbl:'Bomba Solar',   net:'agua',valve:true},
   tanque:      {ico:'💧',lbl:'Tanque',        net:'agua',src:true},
   llave_agua:  {ico:'🚰',lbl:'Llave Agua',    net:'agua',valve:true},
   llave_t:     {ico:'⊤', lbl:'Llave T',       net:'agua',valve:true},
@@ -535,7 +535,7 @@ function calcStates(){
     return reached;
   }
   const eS=Object.values(S.elems).filter(e=>e.type==='energizador'&&e.on).map(e=>e.id);
-  const wS=Object.values(S.elems).filter(e=>(e.type==='tanque'||e.type==='bomba_solar')&&e.on).map(e=>e.id);
+  const wS=Object.values(S.elems).filter(e=>e.type==='tanque'&&e.on).map(e=>e.id);
   return{energized:bfs(eS,'elec'),watered:bfs(wS,'agua')};
 }
 
@@ -560,7 +560,8 @@ function askTog(id){
   const el=S.elems[id];if(!el)return;
   togPending=id;
   const ns=!el.on;
-  document.getElementById('mt-title').textContent=(ns?'ABRIR ':'CERRAR ')+el.name.toUpperCase();
+  const isSrc=T[el.type]?.src;
+  document.getElementById('mt-title').textContent=(ns?(isSrc?'ENCENDER ':'ABRIR '):(isSrc?'APAGAR ':'CERRAR '))+el.name.toUpperCase();
   document.getElementById('mt-id').value=id;
   const changes=simTog(id);
   const d=document.getElementById('mt-sim');
@@ -642,11 +643,16 @@ function renderLlaves(en,wa){
   const ll=Object.values(S.elems).filter(e=>T[e.type]?.valve);
   const d=document.getElementById('llave-list');
   if(!ll.length){d.innerHTML='<div class="es"><div class="bi">🔌</div>Sin llaves.<br>Importá KMZ en Config.</div>';return;}
-  d.innerHTML=ll.map(el=>`<div class="ei" onclick="askTog('${el.id}')">
-    <span class="ei-ico">${T[el.type].ico}</span>
-    <div class="ei-info"><div class="ei-name">${el.name}</div><div class="ei-sub">${T[el.type].lbl} · S${el.sistema||1}</div></div>
-    <button class="vbtn ${el.on?'vo':'vc'}" onclick="event.stopPropagation();askTog('${el.id}')">${el.on?'ABIERTA':'CERRADA'}</button>
-  </div>`).join('');
+  d.innerHTML=ll.map(el=>{
+    const isSrc=T[el.type]?.src;
+    const stateOn=isSrc?'ENCENDIDA':'ABIERTA';
+    const stateOff=isSrc?'APAGADA':'CERRADA';
+    return `<div class="ei" onclick="askTog('${el.id}')">
+      <span class="ei-ico">${T[el.type].ico}</span>
+      <div class="ei-info"><div class="ei-name">${el.name}</div><div class="ei-sub">${T[el.type].lbl} · S${el.sistema||1}</div></div>
+      <button class="vbtn ${el.on?'vo':'vc'}" onclick="event.stopPropagation();askTog('${el.id}')">${el.on?stateOn:stateOff}</button>
+    </div>`;
+  }).join('');
 }
 
 function renderInfra(){
