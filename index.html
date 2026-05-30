@@ -581,6 +581,16 @@ body{display:flex;flex-direction:column}
 <script>
 'use strict';
 
+// ── MAP (declarado primero para evitar ReferenceError con const) ──
+const osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
+const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
+const map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
+map.setView([-31.4,-55.42],13);
+const baseL=L.layerGroup().addTo(map);
+const elemL=L.layerGroup().addTo(map);
+let satOn=false;
+function togLayer(){satOn=!satOn;satOn?map.addLayer(sat)&&map.removeLayer(osm):map.addLayer(osm)&&map.removeLayer(sat);document.getElementById('btn-sat').classList.toggle('active',satOn);}
+
 // ── TIPOS ──────────────────────────────────────────────────
 const T={
   energizador:{ico:'⚡',lbl:'Energizador',net:'elec',src:true,valve:true},
@@ -653,16 +663,6 @@ function dismissBackupWarn(){
 function vibrate(pattern){
   if(navigator.vibrate)navigator.vibrate(pattern);
 }
-
-// ── MAP ────────────────────────────────────────────────────
-const osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
-const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
-const map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
-map.setView([-31.4,-55.42],13);
-const baseL=L.layerGroup().addTo(map);
-const elemL=L.layerGroup().addTo(map);
-let satOn=false;
-function togLayer(){satOn=!satOn;satOn?map.addLayer(sat)&&map.removeLayer(osm):map.addLayer(osm)&&map.removeLayer(sat);document.getElementById('btn-sat').classList.toggle('active',satOn);}
 
 // ── PERSIST ────────────────────────────────────────────────
 function save(){
