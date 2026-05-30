@@ -204,7 +204,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v38b</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v39</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -795,13 +795,44 @@ function renderLlaves(en,wa){
   const ll=Object.values(S.elems).filter(e=>T[e.type]?.valve);
   const d=document.getElementById('llave-list');
   if(!ll.length){d.innerHTML='<div class="es"><div class="bi">🔌</div>Sin llaves.<br>Importá KMZ en Config.</div>';return;}
+
   d.innerHTML=ll.map(el=>{
-    const isSrc=T[el.type]?.src;
+    const ti=T[el.type];
+    const isJunc=JUNC.includes(el.type)&&el.outlets;
+    const isSrc=ti?.src;
+
+    if(isJunc){
+      // Expandir cada salida como fila separada
+      const juncRows=el.outlets.map((o,i)=>{
+        const isWater=ti.net==='agua'||ti.net==='both';
+        const flowing=(isWater?wa:en).has(el.id)&&o.open;
+        return `<div class="ei" style="padding:6px 8px 6px 14px;border-left:2px solid ${o.open?'#42a5f5':'#ef5350'}" onclick="toggleOutlet('${el.id}',${i})">
+          <span class="ei-ico" style="font-size:12px;color:${o.open?'#42a5f5':'#ef5350'}">${isWater?'🚰':'🔌'}</span>
+          <div class="ei-info">
+            <div class="ei-name" style="font-size:11px">${el.name} — ${o.name||'Sal.'+(i+1)}</div>
+            <div class="ei-sub">${ti.lbl} · S${el.sistema||1} · ${flowing?'💧 FLUYE':'⛔ CORTADA'}</div>
+          </div>
+          <button class="vbtn ${o.open?'vo':'vc'}" onclick="event.stopPropagation();toggleOutlet('${el.id}',${i})">${o.open?'ABIERTA':'CERRADA'}</button>
+        </div>`;
+      }).join('');
+      return `<div style="border-bottom:1px solid var(--brd)">
+        <div class="ei" style="background:var(--surf2);cursor:pointer" onclick="showJunc('${el.id}')">
+          <span class="ei-ico">${ti.ico}</span>
+          <div class="ei-info">
+            <div class="ei-name">${el.name}</div>
+            <div class="ei-sub">${ti.lbl} · S${el.sistema||1} · ${el.outlets.filter(o=>o.open).length}/${el.outlets.length} abiertas</div>
+          </div>
+          <span style="font-size:10px;color:var(--txt2);font-family:var(--mono)">▼</span>
+        </div>
+        ${juncRows}
+      </div>`;
+    }
+
     const stateOn=isSrc?'ENCENDIDA':'ABIERTA';
     const stateOff=isSrc?'APAGADA':'CERRADA';
     return `<div class="ei" onclick="askTog('${el.id}')">
-      <span class="ei-ico">${T[el.type].ico}</span>
-      <div class="ei-info"><div class="ei-name">${el.name}</div><div class="ei-sub">${T[el.type].lbl} · S${el.sistema||1}</div></div>
+      <span class="ei-ico">${ti.ico}</span>
+      <div class="ei-info"><div class="ei-name">${el.name}</div><div class="ei-sub">${ti.lbl} · S${el.sistema||1}</div></div>
       <button class="vbtn ${el.on?'vo':'vc'}" onclick="event.stopPropagation();askTog('${el.id}')">${el.on?stateOn:stateOff}</button>
     </div>`;
   }).join('');
