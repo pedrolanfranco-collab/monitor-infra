@@ -181,7 +181,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v27</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v28</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -623,7 +623,7 @@ function renderAll(){
       fc=watered.has(el.id)?'#26c6da':'#ef5350';fo=0.85;
     }
     if(el.geom.type==='Polygon'){
-      L.polygon(el.geom.coords,{color:'#000',fillColor:fc,weight:2,fillOpacity:0.15}).addTo(elemL);
+      L.polygon(el.geom.coords,{color:'#111',fillColor:fc,weight:1.2,fillOpacity:0.18,opacity:0.7}).addTo(elemL);
     }
     const m=L.circleMarker([el.geom.lat,el.geom.lng],{radius:ms.r,color:fc,fillColor:fc,weight:2,fillOpacity:fo});
     const vs=ti.valve?(el.on?' [ABIERTA]':' [CERRADA]'):'';
@@ -819,7 +819,7 @@ function renderAllWithFilter(){
     let fc=ms.c,fo=el.on?0.85:0.25;
     if(el.type==='potrero'){const hE=en2.has(el.id),hW=wa2.has(el.id);fc=hE&&hW?'#4caf50':!hE&&!hW?'#ef5350':'#ffb300';fo=0.85;}
     if(el.type==='bebedero'){fc=wa2.has(el.id)?'#26c6da':'#ef5350';fo=0.85;}
-    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:'#000',fillColor:fc,weight:2,fillOpacity:0.15}).addTo(elemL);
+    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:'#111',fillColor:fc,weight:1.2,fillOpacity:0.18,opacity:0.7}).addTo(elemL);
     const m=L.circleMarker([el.geom.lat,el.geom.lng],{radius:ms.r,color:fc,fillColor:fc,weight:2,fillOpacity:fo});
     const vs=ti.valve?(el.on?' [ABIERTA]':' [CERRADA]'):'';
     const ss=el.salidas?` · ${el.salidas} sal`:'';
@@ -1087,7 +1087,7 @@ async function importKMZ(inp){
   if(!feats.length){alert('Sin elementos con geometría');return;}
   baseL.clearLayers();
   feats.forEach(f=>{
-    if(f.geom.type==='Polygon')L.polygon(f.geom.coords,{color:'#000',weight:1.5,fillOpacity:0.05}).bindTooltip(f.name).addTo(baseL);
+    if(f.geom.type==='Polygon')L.polygon(f.geom.coords,{color:'#111',weight:1,fillOpacity:0.04,opacity:0.55}).bindTooltip(f.name).addTo(baseL);
     else if(f.geom.type==='LineString')L.polyline(f.geom.coords,{color:'#3d5e40',weight:1.5,opacity:.5}).addTo(baseL);
   });
   try{const all=baseL.getLayers();if(all.length){const b=L.featureGroup(all).getBounds();if(b.isValid())map.fitBounds(b,{padding:[30,30]});}}catch(e){}
