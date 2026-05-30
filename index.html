@@ -206,7 +206,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v41</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v42</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -936,11 +936,31 @@ function renderCfg(){
   const el=Object.values(S.elems);
   document.getElementById('cfg-ec').textContent=el.length;
   document.getElementById('cfg-cc').textContent=S.conns.length;
-  document.getElementById('cfg-el').innerHTML=el.length?el.map(e=>`<div class="cei">
+
+  // Separar puntos sin clasificar (potrero/Point) del resto
+  const sinClas=el.filter(e=>e.type==='potrero'&&e.geom.type==='Point');
+  const resto=el.filter(e=>!(e.type==='potrero'&&e.geom.type==='Point'));
+
+  let html='';
+
+  if(sinClas.length){
+    html+=`<div style="background:rgba(255,179,0,.1);border:1px solid rgba(255,179,0,.35);border-radius:5px;padding:6px 8px;margin-bottom:8px">
+      <div style="font-family:var(--cond);font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--amber);margin-bottom:6px">⚠ SIN CLASIFICAR (${sinClas.length})</div>
+      ${sinClas.map(e=>`<div class="cei" style="background:rgba(255,179,0,.06);border-radius:3px;padding:4px 6px;margin-bottom:3px;border-bottom:none">
+        <span class="cei-ico">❓</span>
+        <span class="cei-n" style="color:var(--amber)">${e.name} <span style="font-size:9px;font-family:var(--mono);color:var(--txt2)">[punto sin tipo]</span></span>
+        <span><button onclick="showEdit('${e.id}')" style="background:rgba(255,179,0,.2);border-radius:3px;padding:2px 6px;color:var(--amber);opacity:1;font-size:10px">✏ Editar</button><button onclick="startMove('${e.id}')">📍</button><button onclick="delElem('${e.id}')">🗑</button></span>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  html+=resto.length?resto.map(e=>`<div class="cei">
     <span class="cei-ico">${T[e.type]?.ico||'?'}</span>
     <span class="cei-n">${e.name} <span style="color:var(--txt3);font-size:9px">[${T[e.type]?.lbl||e.type}]</span></span>
     <span><button onclick="showEdit('${e.id}')">✏️</button><button onclick="startMove('${e.id}')">📍</button><button onclick="delElem('${e.id}')">🗑</button></span>
-  </div>`).join(''):'<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';
+  </div>`).join(''):'';
+
+  document.getElementById('cfg-el').innerHTML=html||'<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';
   renderConnList();
 }
 
