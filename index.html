@@ -1479,8 +1479,15 @@ async function importJSON(inp){
     Object.assign(S.elems,d.elems);
     if(d.conns)S.conns.push.apply(S.conns,d.conns);
     if(d.hist)S.hist.push.apply(S.hist,d.hist);
+    console.log('[Import] elems:',Object.keys(S.elems).length,'conns:',S.conns.length);
     save();
     renderAll();
+    renderCfg();
+    // Ir al tab MAPA para ver los datos
+    document.querySelectorAll('.pv').forEach(function(p){p.classList.remove('on');});
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+    document.getElementById('pv-mapa').classList.add('on');
+    document.querySelector('.tab').classList.add('active');
     // fitBounds a los elementos importados
     var pts2=Object.values(S.elems).filter(function(e){return e.geom;});
     if(pts2.length){
@@ -1490,6 +1497,7 @@ async function importJSON(inp){
         if(b2.isValid())map.fitBounds(b2,{padding:[40,40]});
       }catch(e){}
     }
+    setTimeout(function(){map.invalidateSize();},200);
     showToast('✅','Importación exitosa',Object.keys(S.elems).length+' elementos · '+S.conns.length+' conexiones cargadas.');
   }catch(e){
     showToast('❌','Error de importación',e.message||'Archivo no reconocido');
