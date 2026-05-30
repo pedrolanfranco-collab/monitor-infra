@@ -181,7 +181,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v25</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v26</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -518,7 +518,7 @@ function calcStates(){
     if(adj[c.from])adj[c.from].push({to:c.to,net:c.net});
     if(adj[c.to])adj[c.to].push({to:c.from,net:c.net});
   });
-  function bfs(srcs,net,stopType){
+  function bfs(srcs,net){
     const reached=new Set(srcs);
     const q=[...srcs];
     while(q.length){
@@ -527,7 +527,8 @@ function calcStates(){
         if(e.net!==net&&e.net!=='both')return;
         if(reached.has(e.to))return;
         const el=S.elems[e.to];if(!el)return;
-        if(el.type===stopType&&!el.on)return;
+        // parar en cualquier válvula cerrada de la red correspondiente
+        if(T[el.type]?.valve&&!el.on)return;
         reached.add(e.to);q.push(e.to);
       });
     }
@@ -535,7 +536,7 @@ function calcStates(){
   }
   const eS=Object.values(S.elems).filter(e=>e.type==='energizador'&&e.on).map(e=>e.id);
   const wS=Object.values(S.elems).filter(e=>(e.type==='tanque'||e.type==='bomba_solar')&&e.on).map(e=>e.id);
-  return{energized:bfs(eS,'elec','llave_elec'),watered:bfs(wS,'agua','llave_agua')};
+  return{energized:bfs(eS,'elec'),watered:bfs(wS,'agua')};
 }
 
 function simTog(id){
