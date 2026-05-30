@@ -193,7 +193,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v33</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v34</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -775,6 +775,7 @@ function renderHist(){
 function addHist(u,a,r){S.hist.unshift({id:uid(),user:u,action:a,result:r||'',ts:new Date().toISOString()});if(S.hist.length>300)S.hist.pop();}
 
 function renderCfg(){
+  const lbl=document.getElementById('cfg-cf-lbl');if(lbl)lbl.style.display=connFilter==='all'?'none':'inline';
   const el=Object.values(S.elems);
   document.getElementById('cfg-ec').textContent=el.length;
   document.getElementById('cfg-cc').textContent=S.conns.length;
@@ -792,8 +793,10 @@ function setConnFilter(f, btn){
   connFilter=f;
   document.querySelectorAll('.cf-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  // Show/hide filter active notice
+  const lbl=document.getElementById('cfg-cf-lbl');
+  if(lbl)lbl.style.display=f==='all'?'none':'inline';
   renderConnList();
-  // Also highlight on map
   renderAllWithFilter();
 }
 
