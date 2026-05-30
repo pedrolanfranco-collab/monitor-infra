@@ -193,12 +193,13 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v35</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v36</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
     <button class="tab" onclick="goTab('potreros',this)">🌿 POTREROS</button>
     <button class="tab" onclick="goTab('historial',this)">📋 LOG</button>
+    <button class="tab" onclick="goTab('red',this)">🔗 RED</button>
     <button class="tab" onclick="goTab('config',this)">⚙ CONFIG</button>
   </div>
   <div id="hdr-right">
@@ -262,6 +263,39 @@ body{display:flex;flex-direction:column}
     <div class="pv" id="pv-historial">
       <div class="ph">LOG DE OPERACIONES<button onclick="S.hist=[];renderHist();save()" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">[limpiar]</button></div>
       <div class="scroll" id="hist-list"><div class="es"><div class="bi">📋</div>Sin registros.</div></div>
+    </div>
+
+    <!-- RED -->
+    <div class="pv" id="pv-red">
+      <div class="ph">ESQUEMA DE RED
+        <div style="display:flex;gap:5px">
+          <button onclick="schZoom(1.2)" style="background:var(--surf2);border:1px solid var(--brd);color:var(--txt2);border-radius:3px;padding:2px 7px;cursor:pointer;font-size:13px">+</button>
+          <button onclick="schZoom(0.8)" style="background:var(--surf2);border:1px solid var(--brd);color:var(--txt2);border-radius:3px;padding:2px 7px;cursor:pointer;font-size:13px">−</button>
+          <button onclick="schFit()" style="background:var(--surf2);border:1px solid var(--brd);color:var(--txt2);border-radius:3px;padding:2px 5px;cursor:pointer;font-size:10px;font-family:var(--mono)">FIT</button>
+        </div>
+      </div>
+      <div style="flex:1;overflow:hidden;position:relative" id="sch-wrap">
+        <svg id="sch-svg" style="width:100%;height:100%;cursor:grab" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arr-agua" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="#29b6f6"/>
+            </marker>
+            <marker id="arr-agua-off" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="#b71c1c"/>
+            </marker>
+            <marker id="arr-elec" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="#ffd54f"/>
+            </marker>
+            <marker id="arr-elec-off" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="#5d4037"/>
+            </marker>
+          </defs>
+          <g id="sch-g" transform="translate(10,10) scale(1)"></g>
+        </svg>
+        <div id="sch-empty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--cond);font-size:12px;color:var(--txt3);text-align:center;padding:20px">
+          Sin conexiones.<br>Agregá conexiones en Config.
+        </div>
+      </div>
     </div>
 
     <!-- CONFIG -->
@@ -528,6 +562,7 @@ function goTab(name,btn){
   document.getElementById('pv-'+name).classList.add('on');
   if(name==='potreros')renderPot();
   if(name==='historial')renderHist();
+  if(name==='red')renderRed();
   if(name==='config')renderCfg();
 }
 
@@ -628,6 +663,7 @@ function confirmTog(){
 
 // ── RENDER MAP ─────────────────────────────────────────────
 function renderAll(){
+  if(document.getElementById('pv-red')?.classList.contains('on'))renderRed();
   const{energized,watered}=calcStates();
   elemL.clearLayers();
   // conexiones con estado de flujo
@@ -1246,6 +1282,135 @@ function resetAll(){if(!confirm('¿Borrar todo?'))return;Object.keys(S.elems).fo
 
 // ── MODAL ──────────────────────────────────────────────────
 function closeM(id){document.getElementById(id).classList.remove('on');}
+
+
+// ── SCHEMA / RED ───────────────────────────────────────────
+let schScale=1, schTx=10, schTy=10;
+let schDrag=false, schDx=0, schDy=0;
+
+const svg=document.getElementById('sch-svg');
+const schG=document.getElementById('sch-g');
+
+svg.addEventListener('mousedown',e=>{schDrag=true;schDx=e.clientX-schTx;schDy=e.clientY-schTy;svg.style.cursor='grabbing';});
+svg.addEventListener('mousemove',e=>{if(!schDrag)return;schTx=e.clientX-schDx;schTy=e.clientY-schDy;schG.setAttribute('transform',`translate(${schTx},${schTy}) scale(${schScale})`);});
+svg.addEventListener('mouseup',()=>{schDrag=false;svg.style.cursor='grab';});
+svg.addEventListener('mouseleave',()=>{schDrag=false;svg.style.cursor='grab';});
+svg.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const delta=e.deltaY>0?0.85:1.18;
+  schScale=Math.max(0.3,Math.min(3,schScale*delta));
+  schG.setAttribute('transform',`translate(${schTx},${schTy}) scale(${schScale})`);
+},{passive:false});
+
+// Touch support
+let lastTouch=null;
+svg.addEventListener('touchstart',e=>{if(e.touches.length===1){schDrag=true;lastTouch=e.touches[0];schDx=e.touches[0].clientX-schTx;schDy=e.touches[0].clientY-schTy;}});
+svg.addEventListener('touchmove',e=>{
+  if(!schDrag||e.touches.length!==1)return;
+  e.preventDefault();
+  schTx=e.touches[0].clientX-schDx;schTy=e.touches[0].clientY-schDy;
+  schG.setAttribute('transform',`translate(${schTx},${schTy}) scale(${schScale})`);
+},{passive:false});
+svg.addEventListener('touchend',()=>{schDrag=false;});
+
+function schZoom(f){
+  schScale=Math.max(0.3,Math.min(3,schScale*f));
+  schG.setAttribute('transform',`translate(${schTx},${schTy}) scale(${schScale})`);
+}
+
+function schFit(){
+  schScale=1;schTx=10;schTy=10;
+  schG.setAttribute('transform',`translate(10,10) scale(1)`);
+}
+
+function renderRed(){
+  const{energized,watered}=calcStates();
+  document.getElementById('sch-empty').style.display=S.conns.length?'none':'flex';
+  if(!S.conns.length){schG.innerHTML='';return;}
+
+  // Gather all nodes involved in connections
+  const nodeIds=new Set();
+  S.conns.forEach(c=>{nodeIds.add(c.from);nodeIds.add(c.to);});
+  const nodes=[...nodeIds].map(id=>S.elems[id]).filter(Boolean);
+
+  // Layered layout: sources → valves/dist → consumers
+  const ORDER=['energizador','bomba_solar','bomba','tanque','llave_elec','llave_agua','llave_t','llave_x','poste_t','poste_x','distribuidor_t','distribuidor_x','bebedero','potrero'];
+  nodes.sort((a,b)=>ORDER.indexOf(a.type)-ORDER.indexOf(b.type));
+
+  // Assign columns by type group
+  const COL={energizador:0,bomba_solar:0,bomba:0,tanque:1,llave_elec:2,llave_agua:2,poste_t:2,poste_x:2,llave_t:2,llave_x:2,distribuidor_t:2,distribuidor_x:2,bebedero:3,potrero:4};
+  const cols={};
+  nodes.forEach(n=>{
+    const c=COL[n.type]??2;
+    if(!cols[c])cols[c]=[];
+    cols[c].push(n);
+  });
+
+  // Position nodes
+  const POS={};
+  const CW=160,CH=60;
+  Object.keys(cols).sort((a,b)=>a-b).forEach(c=>{
+    cols[c].forEach((n,i)=>{
+      POS[n.id]={x:parseInt(c)*CW+20, y:i*CH+30};
+    });
+  });
+
+  const NCOLORS={
+    energizador:'#ffb300',bomba:'#ff7043',bomba_solar:'#aed581',
+    tanque:'#1565c0',llave_agua:'#42a5f5',llave_t:'#00acc1',llave_x:'#00acc1',
+    llave_elec:'#ffb300',distribuidor_t:'#80cbc4',distribuidor_x:'#80cbc4',
+    poste_t:'#ffe082',poste_x:'#ffe082',bebedero:'#26c6da',potrero:'#4caf50'
+  };
+
+  let svg_content='';
+
+  // Draw edges
+  S.conns.forEach(c=>{
+    const a=POS[c.from],b=POS[c.to];if(!a||!b)return;
+    const isWater=c.net==='agua';
+    const flowing=isWater?(watered.has(c.from)&&watered.has(c.to)):(energized.has(c.from)&&energized.has(c.to));
+    const col=isWater?(flowing?'#29b6f6':'#b71c1c'):(flowing?'#ffd54f':'#5d4037');
+    const dash=flowing?'none':'6,4';
+    const marker=isWater?(flowing?'arr-agua':'arr-agua-off'):(flowing?'arr-elec':'arr-elec-off');
+    const ax=a.x+50,ay=a.y+18,bx=b.x+50,by=b.y+18;
+    // Bezier curve
+    const mx=(ax+bx)/2;
+    svg_content+=`<path d="M${ax},${ay} C${mx},${ay} ${mx},${by} ${bx},${by}" fill="none" stroke="${col}" stroke-width="2" stroke-dasharray="${dash}" marker-end="url(#${marker})"/>`;
+  });
+
+  // Draw nodes
+  nodes.forEach(n=>{
+    const p=POS[n.id];if(!p)return;
+    const ti=T[n.type]||{ico:'?',lbl:n.type};
+    const nc=NCOLORS[n.type]||'#888';
+    const isValve=T[n.type]?.valve;
+    const active=watered.has(n.id)||energized.has(n.id);
+    const borderW=isValve?2:1.5;
+    const bgOp=n.on?'0.15':'0.06';
+    const stateStr=isValve?(n.on?'▶':'■'):'';
+    const stateCol=n.on?nc:'#666';
+    svg_content+=`
+      <g transform="translate(${p.x},${p.y})" style="cursor:pointer" onclick="schNodeClick('${n.id}')">
+        <rect x="0" y="0" width="100" height="36" rx="5"
+          fill="${nc}" fill-opacity="${bgOp}"
+          stroke="${active?nc:'#333'}" stroke-width="${borderW}"/>
+        <text x="8" y="14" font-size="12" font-family="Barlow Condensed,sans-serif" fill="${nc}" font-weight="700">${ti.ico} ${n.name.length>9?n.name.substr(0,9)+'…':n.name}</text>
+        <text x="8" y="28" font-size="9" font-family="Share Tech Mono,monospace" fill="#6a9b6e">${ti.lbl}${n.sistema?' S'+n.sistema:''}</text>
+        ${isValve?`<text x="88" y="14" font-size="10" text-anchor="end" font-family="Share Tech Mono" fill="${stateCol}">${stateStr}</text>`:''}
+      </g>`;
+  });
+
+  schG.innerHTML=svg_content;
+}
+
+function schNodeClick(id){
+  const el=S.elems[id];if(!el)return;
+  if(T[el.type]?.valve){
+    // Switch to mapa tab and open toggle
+    goTab('mapa',document.querySelector('.tab'));
+    setTimeout(()=>askTog(id),100);
+  }
+}
 
 // ── INIT ───────────────────────────────────────────────────
 load();
