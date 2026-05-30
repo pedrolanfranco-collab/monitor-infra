@@ -437,7 +437,7 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
   <div id="hdr-brand">
     <div>
       <div class="logo">⚡💧 INFRAESTRUCTURA</div>
-      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v18</div>
+      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v21</div>
     </div>
   </div>
   <div id="tabs">
@@ -472,6 +472,7 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
       <div class="leg-row"><div class="leg-dot" style="background:#1565c0"></div>Tanque</div>
       <div class="leg-row"><div class="leg-dot" style="background:#42a5f5"></div>Llave de agua</div>
       <div class="leg-row"><div class="leg-dot" style="background:#80cbc4"></div>Distribución T / Cruz</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#00acc1"></div>Llave en T / Cruz</div>
       <div class="leg-row"><div class="leg-dot" style="background:#26c6da"></div>Bebedero</div>
     </div>
   </div>
@@ -487,9 +488,13 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
         <div class="stat-card"><div class="sv sv-blue" id="s-agua-ok">—</div><div class="sl">💧 CON AGUA</div></div>
         <div class="stat-card"><div class="sv sv-amber" id="s-agua-nok">—</div><div class="sl">💧 SIN AGUA</div></div>
       </div>
-      <div class="sec-lbl">LLAVES</div>
+      <div class="sec-lbl">LLAVES OPERABLES</div>
       <div class="scroll" id="llave-list">
         <div class="empty-state"><div class="big">🔌</div>Sin llaves configuradas.<br>Importá un KMZ en Config.</div>
+      </div>
+      <div class="sec-lbl">INFRAESTRUCTURA</div>
+      <div style="height:160px;overflow-y:auto" id="infra-list">
+        <div class="empty-state" style="padding:12px"><div class="big" style="font-size:18px">💧</div>Sin elementos.</div>
       </div>
     </div>
 
@@ -578,6 +583,8 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
         <option value="llave_agua">🚰 Llave de Agua</option>
         <option value="distribuidor_t">⊤ Distribución T</option>
         <option value="distribuidor_x">✚ Distribución Cruz</option>
+        <option value="llave_t">⊤ Llave en T</option>
+        <option value="llave_x">✚ Llave en Cruz</option>
         <option value="bebedero">🐄 Bebedero</option>
       </optgroup>
       <optgroup label="─ General ─">
@@ -591,6 +598,14 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
         <option value="2">Sistema 2</option>
         <option value="3">Sistema 3</option>
         <option value="4">Sistema 4</option>
+      </select>
+    </div>
+    <div id="e-salidas-row" style="display:none">
+      <label>Número de salidas</label>
+      <select id="e-salidas">
+        <option value="2">2 salidas</option>
+        <option value="3">3 salidas</option>
+        <option value="4">4 salidas</option>
       </select>
     </div>
     <label>Estado inicial</label>
@@ -643,6 +658,8 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
         <option value="llave_agua">🚰 Llave de Agua</option>
         <option value="distribuidor_t">⊤ Distribución T</option>
         <option value="distribuidor_x">✚ Distribución Cruz</option>
+        <option value="llave_t">⊤ Llave en T</option>
+        <option value="llave_x">✚ Llave en Cruz</option>
         <option value="bebedero">🐄 Bebedero</option>
       </optgroup>
       <optgroup label="─ General ─">
@@ -680,7 +697,9 @@ const TYPES = {
   bomba_solar:  { ico:'🌞', lbl:'Bomba Solar',     color:'#aed581', net:'agua', src:true   },
   tanque:       { ico:'💧', lbl:'Tanque',           color:'#1565c0', net:'agua', src:true  },
   llave_agua:      { ico:'🚰', lbl:'Llave de Agua',    color:'#42a5f5', net:'agua', valve:true },
-  distribuidor_t:  { ico:'⊤',  lbl:'Distribución T',   color:'#80cbc4', net:'agua' },
+  distribuidor_t:  { ico:'⊤',  lbl:'Distribución T',    color:'#80cbc4', net:'agua' },
+  llave_t:         { ico:'⊤',  lbl:'Llave en T',         color:'#00acc1', net:'agua', valve:true },
+  llave_x:         { ico:'✚',  lbl:'Llave en Cruz',       color:'#00acc1', net:'agua', valve:true },
   distribuidor_x:  { ico:'✚',  lbl:'Distribución Cruz', color:'#80cbc4', net:'agua' },
   bebedero:        { ico:'🐄', lbl:'Bebedero',          color:'#26c6da', net:'agua' },
   potrero:      { ico:'🌿', lbl:'Potrero',          color:'#4caf50', net:'both' },
@@ -968,6 +987,7 @@ function renderAll(){
   const {energized,watered}=calcStates();
   renderMap(energized,watered);
   renderLlaves(energized,watered);
+  renderInfra();
   renderStats(energized,watered);
   updateHdrBadges(energized,watered);
 }
@@ -1003,7 +1023,9 @@ function renderMap(energized,watered){
       bomba_solar:  { radius:8,  color:'#aed581' },  // verde claro
       tanque:       { radius:8,  color:'#1565c0' },
       llave_agua:      { radius:7,  color:'#42a5f5' },
-      distribuidor_t:  { radius:6,  color:'#80cbc4' },  // verde agua
+      distribuidor_t:  { radius:6,  color:'#80cbc4' },
+      llave_t:         { radius:7,  color:'#00acc1' },
+      llave_x:         { radius:7,  color:'#00acc1' },  // verde agua
       distribuidor_x:  { radius:6,  color:'#80cbc4' },
       bebedero:        { radius:5,  color:'#26c6da' },
     };
@@ -1030,7 +1052,8 @@ function renderMap(energized,watered){
     });
 
     const valveStr=(ti.valve)?(el.on?' [ABIERTA]':' [CERRADA]'):'';
-    m.bindTooltip(`${ti.ico} ${el.name}${valveStr}`,{direction:'top',offset:[0,-8]});
+    const salidasStr=el.salidas?` · ${el.salidas} salidas`:'';
+    m.bindTooltip(`${ti.ico} ${el.name}${valveStr}${salidasStr}`,{direction:'top',offset:[0,-8]});
 
     m.on('click',()=>{
       if(connMode){ handleConnClick(el.id); return; }
@@ -1084,7 +1107,34 @@ function updateHdrBadges(energized,watered){
   document.getElementById('hdr-agua-dot').style.background=wOk===pts.length?'#42a5f5':wOk>0?'#ffb300':'#ef5350';
 }
 
-function renderPotreros(){
+function renderInfra(){
+  const NON_VALVE_TYPES = ['tanque','bomba','bomba_solar','energizador','distribuidor_t','distribuidor_x','poste_t','poste_x','bebedero'];
+  const elems = Object.values(S.elems).filter(e => NON_VALVE_TYPES.includes(e.type));
+  const div = document.getElementById('infra-list');
+  if(!elems.length){
+    div.innerHTML='<div class="empty-state" style="padding:12px"><div class="big" style="font-size:18px">💧</div>Sin elementos.</div>';
+    return;
+  }
+  const sorted = [...elems].sort((a,b)=>{
+    const order = ['energizador','bomba','bomba_solar','tanque','distribuidor_t','distribuidor_x','poste_t','poste_x','bebedero'];
+    return order.indexOf(a.type) - order.indexOf(b.type);
+  });
+  div.innerHTML = sorted.map(el=>{
+    const ti = TYPES[el.type]||{ico:'?',lbl:el.type};
+    const ms = {tanque:'#1565c0',bomba:'#ff7043',bomba_solar:'#aed581',energizador:'#ffb300',
+      distribuidor_t:'#80cbc4',distribuidor_x:'#80cbc4',poste_t:'#ffe082',poste_x:'#ffe082',bebedero:'#26c6da'};
+    const col = ms[el.type]||'#888';
+    return `<div class="ei" onclick="map.setView([${el.geom.lat},${el.geom.lng}],17)">
+      <span class="ei-ico" style="color:${col}">${ti.ico}</span>
+      <div class="ei-info">
+        <div class="ei-name">${el.name}</div>
+        <div class="ei-sub">${ti.lbl}${el.sistema?' · SIST.'+el.sistema:''}${el.salidas?' · '+el.salidas+' sal.':''}</div>
+      </div>
+      <span style="font-size:9px;color:${el.on?'var(--green2)':'var(--red)'}">●</span>
+    </div>`;
+  }).join('');
+}
+
   const {energized,watered}=calcStates();
   const pts=Object.values(S.elems).filter(e=>e.type==='potrero');
   const div=document.getElementById('potrero-list');
@@ -1161,6 +1211,7 @@ function editElem(id){
   document.getElementById('e-type').value=el.type;
   document.getElementById('e-sistema').value=el.sistema||1;
   document.getElementById('e-estado').value=el.on?'1':'0';
+  if(el.salidas) document.getElementById('e-salidas').value=el.salidas;
   document.getElementById('m-elem-delete').style.display='block';
   onETypeChange();
   document.getElementById('m-elem').classList.add('open');
@@ -1180,6 +1231,8 @@ function saveElem(){
   const type=document.getElementById('e-type').value;
   const sist=parseInt(document.getElementById('e-sistema').value);
   const on=document.getElementById('e-estado').value==='1';
+  const JUNC=['distribuidor_t','distribuidor_x','llave_t','llave_x','poste_t','poste_x'];
+  const salidas=JUNC.includes(type)?parseInt(document.getElementById('e-salidas').value):null;
   if(!name){ alert('Ingrese un nombre'); return; }
   const existing=S.elems[id];
   const ll=document._pendingLatLng;
@@ -1189,7 +1242,7 @@ function saveElem(){
       ? {type:'Point', lat:ll.lat, lng:ll.lng}
       : {type:'Point', lat:map.getCenter().lat, lng:map.getCenter().lng};
   S.elems[id]={
-    id,type,name,sistema:sist,on,
+    id,type,name,sistema:sist,on,salidas,
     geom:existing?.geom||defaultGeom,
     fromKMZ:existing?.fromKMZ||false
   };
@@ -1206,8 +1259,15 @@ function deleteElem(id){
 }
 function onETypeChange(){
   const t=document.getElementById('e-type').value;
-  const show=['energizador','llave_elec','tanque','llave_agua'].includes(t);
-  document.getElementById('e-sistema-row').style.display=show?'block':'none';
+  const SIST_TYPES=['energizador','llave_elec','bomba','bomba_solar','tanque','llave_agua','llave_t','llave_x','distribuidor_t','distribuidor_x','poste_t','poste_x'];
+  const JUNC_TYPES=['distribuidor_t','distribuidor_x','llave_t','llave_x','poste_t','poste_x'];
+  document.getElementById('e-sistema-row').style.display=SIST_TYPES.includes(t)?'block':'none';
+  document.getElementById('e-salidas-row').style.display=JUNC_TYPES.includes(t)?'block':'none';
+  if(JUNC_TYPES.includes(t)){
+    const sel=document.getElementById('e-salidas');
+    if(t.endsWith('_t')) sel.value='2';
+    else sel.value='3';
+  }
 }
 
 let usingSat=true;

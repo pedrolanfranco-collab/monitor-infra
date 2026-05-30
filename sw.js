@@ -1,4 +1,4 @@
-const CACHE = 'monitor-infra-v13';
+const CACHE = 'monitor-infra-v16';
 const STATIC = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
