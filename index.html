@@ -179,6 +179,17 @@ body{display:flex;flex-direction:column}
   pointer-events:none;
 }
 
+/* OUTLET VALVE */
+.outlet-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--brd)}
+.outlet-row:last-child{border-bottom:none}
+.outlet-ico{font-size:18px;width:24px;text-align:center}
+.outlet-info{flex:1}
+.outlet-name{font-size:12px;font-weight:600}
+.outlet-sub{font-size:9px;font-family:var(--mono);color:var(--txt2);margin-top:1px}
+.outlet-btn{padding:5px 12px;border-radius:4px;border:none;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;transition:all .15s}
+.ob-open{background:rgba(76,175,80,.15);color:var(--green2);border:1px solid rgba(76,175,80,.3)}
+.ob-closed{background:rgba(239,83,80,.15);color:var(--red);border:1px solid rgba(239,83,80,.3)}
+
 /* MOBILE */
 @media(max-width:640px){
   #panel{position:absolute;bottom:0;left:0;right:0;width:100%;height:45%;z-index:300;border-left:none;border-top:2px solid var(--brd2)}
@@ -193,7 +204,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v37</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v38b</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -445,6 +456,18 @@ body{display:flex;flex-direction:column}
   </div>
 </div>
 
+<!-- MODAL: Junction valves -->
+<div class="modal" id="m-junc">
+  <div class="mbox">
+    <h2 id="mj-title">DISTRIBUCIÓN</h2>
+    <p style="font-size:11px;color:var(--txt2);margin-bottom:10px">Abrí o cerrá cada salida individualmente.</p>
+    <div id="mj-outlets"></div>
+    <div class="mac" style="margin-top:12px">
+      <button class="m-cn" onclick="closeM('m-junc')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: PIN -->
 <div class="modal" id="m-pin">
   <div class="mbox">
@@ -609,6 +632,26 @@ function calcStates(){
     if(adj[c.from])adj[c.from].push({to:c.to,net:c.net});
     if(adj[c.to])adj[c.to].push({to:c.from,net:c.net});
   });
+  // Build outlet map: junction → neighbor → outlet index
+  const outletMap={};
+  S.conns.forEach(c=>{
+    const a=S.elems[c.from],b=S.elems[c.to];if(!a||!b)return;
+    if(JUNC.includes(a.type)&&a.outlets){
+      if(!outletMap[a.id])outletMap[a.id]={};
+      if(outletMap[a.id][c.to]===undefined){
+        const usedCount=Object.keys(outletMap[a.id]).length;
+        outletMap[a.id][c.to]=Math.min(usedCount,a.outlets.length-1);
+      }
+    }
+    if(JUNC.includes(b.type)&&b.outlets){
+      if(!outletMap[b.id])outletMap[b.id]={};
+      if(outletMap[b.id][c.from]===undefined){
+        const usedCount=Object.keys(outletMap[b.id]).length;
+        outletMap[b.id][c.from]=Math.min(usedCount,b.outlets.length-1);
+      }
+    }
+  });
+
   function bfs(srcs,net){
     const reached=new Set(srcs);
     const q=[...srcs];
@@ -618,8 +661,13 @@ function calcStates(){
         if(e.net!==net&&e.net!=='both')return;
         if(reached.has(e.to))return;
         const el=S.elems[e.to];if(!el)return;
-        // parar en cualquier válvula cerrada de la red correspondiente
         if(T[el.type]?.valve&&!el.on)return;
+        // Check if current junction's outlet to this neighbor is open
+        const curEl=S.elems[cur];
+        if(curEl&&JUNC.includes(curEl.type)&&curEl.outlets&&outletMap[cur]){
+          const oi=outletMap[cur][e.to];
+          if(oi!==undefined&&!curEl.outlets[oi]?.open)return;
+        }
         reached.add(e.to);q.push(e.to);
       });
     }
@@ -734,7 +782,7 @@ function renderAll(){
       const ss=el.salidas?` · ${el.salidas} sal`:'';
       m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
     }
-    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(ti.valve)askTog(el.id);});
+    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);else if(ti.valve)askTog(el.id);});
     m.addTo(elemL);
   });
   renderLlaves(energized,watered);
@@ -947,7 +995,7 @@ function renderAllWithFilter(){
       const ss=el.salidas?` · ${el.salidas} sal`:'';
       m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
     }
-    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(ti.valve)askTog(el.id);});
+    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);else if(ti.valve)askTog(el.id);});
     m.addTo(elemL);
   });
   renderLlaves(energized,watered);renderInfra();renderStats(energized,watered);updateHdr(energized,watered);
@@ -1000,7 +1048,15 @@ function saveElem(){
   const ex=S.elems[id];
   const ll=document._ll;
   const dg=pendingGeom?pendingGeom:ll?{type:'Point',lat:ll.lat,lng:ll.lng}:{type:'Point',lat:map.getCenter().lat,lng:map.getCenter().lng};
-  S.elems[id]={id,type,name,sistema:sist,on,salidas,geom:ex?.geom||dg,fromKMZ:ex?.fromKMZ||false};
+  // Initialize outlets for junctions
+  let outlets=ex?.outlets||null;
+  if(JUNC.includes(type)){
+    const n=salidas||2;
+    if(!outlets||outlets.length!==n){
+      outlets=Array.from({length:n},(_,i)=>({open:true,name:'Salida '+(i+1)}));
+    }
+  }
+  S.elems[id]={id,type,name,sistema:sist,on,salidas,outlets,geom:ex?.geom||dg,fromKMZ:ex?.fromKMZ||false};
   pendingGeom=null;document._ll=null;
   closeM('m-elem');renderAll();save();
 }
@@ -1472,7 +1528,8 @@ function pickElem(id){
   document.getElementById('m-pick').style.display='none';
   if(connMode){handleConn(id);return;}
   const el=S.elems[id];if(!el)return;
-  if(T[el.type]?.valve) askTog(id);
+  if(JUNC.includes(el.type)&&el.outlets) showJunc(id);
+  else if(T[el.type]?.valve) askTog(id);
 }
 
 // Close picker on outside click
@@ -1481,8 +1538,69 @@ document.addEventListener('click',function(e){
   if(pop&&pop.style.display!=='none'&&!pop.contains(e.target))pop.style.display='none';
 });
 
+
+// ── JUNCTION VALVE MANAGEMENT ──────────────────────────────
+function showJunc(id){
+  const el=S.elems[id];if(!el||!el.outlets)return;
+  const ti=T[el.type]||{ico:'?'};
+  document.getElementById('mj-title').textContent=ti.ico+' '+el.name;
+  renderJuncOutlets(id);
+  document.getElementById('m-junc').classList.add('on');
+}
+
+function renderJuncOutlets(id){
+  const el=S.elems[id];if(!el)return;
+  const{watered,energized}=calcStates();
+  const d=document.getElementById('mj-outlets');
+  d.innerHTML=el.outlets.map((o,i)=>{
+    const isWater=T[el.type]?.net==='agua'||T[el.type]?.net==='both';
+    const flowing=isWater?watered.has(id):energized.has(id);
+    const canFlow=flowing&&o.open;
+    const stateIco=canFlow?'💧':'🚫';
+    return `<div class="outlet-row">
+      <div class="outlet-ico" style="color:${o.open?'#42a5f5':'#ef5350'}">${isWater?'🚰':'🔌'}</div>
+      <div class="outlet-info">
+        <div class="outlet-name">${o.name||'Salida '+(i+1)}</div>
+        <div class="outlet-sub">${o.open?stateIco+' FLUYE':'⛔ CORTADA'}</div>
+      </div>
+      <button class="outlet-btn ${o.open?'ob-open':'ob-closed'}"
+        onclick="toggleOutlet('${id}',${i})">
+        ${o.open?'ABIERTA':'CERRADA'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function toggleOutlet(id,idx){
+  const el=S.elems[id];if(!el||!el.outlets)return;
+  el.outlets[idx].open=!el.outlets[idx].open;
+  addHist('Op',`${el.outlets[idx].open?'Abrió':'Cerró'} "${el.name}" - Salida ${idx+1}`);
+  renderJuncOutlets(id);
+  renderAll();save();
+}
+
+function renameOutlet(id,idx){
+  const el=S.elems[id];if(!el||!el.outlets)return;
+  const cur=el.outlets[idx].name||'Salida '+(idx+1);
+  const nv=prompt('Nombre de la salida:',cur);
+  if(nv&&nv.trim()){el.outlets[idx].name=nv.trim();renderJuncOutlets(id);save();}
+}
+
 // ── INIT ───────────────────────────────────────────────────
 load();
+
+// Migración: agregar outlets a junctions existentes sin ellos
+(function migrate(){
+  let changed=false;
+  Object.values(S.elems).forEach(el=>{
+    if(JUNC.includes(el.type)&&!el.outlets){
+      const n=el.salidas||2;
+      el.outlets=Array.from({length:n},(_,i)=>({open:true,name:'Salida '+(i+1)}));
+      changed=true;
+    }
+  });
+  if(changed){save();console.log('Migración outlets OK');}
+})();
 renderAll();
 setTimeout(()=>{
   const pts=Object.values(S.elems).filter(e=>e.geom);
