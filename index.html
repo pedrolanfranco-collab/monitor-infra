@@ -193,7 +193,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v36</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v37</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -460,6 +460,15 @@ body{display:flex;flex-direction:column}
       <button class="m-cn" onclick="closeM('m-pin');pinCb=null">Cancelar</button>
       <button class="m-dn" onclick="confirmPIN()">Confirmar</button>
     </div>
+  </div>
+</div>
+
+<!-- POPUP: Seleccionar elemento cercano -->
+<div id="m-pick" style="display:none;position:fixed;z-index:3000;background:var(--surf);border:1px solid var(--brd2);border-radius:8px;padding:6px 0;min-width:180px;box-shadow:0 8px 30px rgba(0,0,0,.6);max-height:260px;overflow-y:auto">
+  <div style="padding:4px 12px 6px;font-family:var(--cond);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--txt2);border-bottom:1px solid var(--brd);margin-bottom:4px">SELECCIONAR ELEMENTO</div>
+  <div id="m-pick-list"></div>
+  <div style="padding:6px 10px 2px;border-top:1px solid var(--brd);margin-top:4px">
+    <button onclick="document.getElementById('m-pick').style.display='none'" style="width:100%;background:transparent;border:none;color:var(--txt2);font-family:var(--cond);font-size:11px;cursor:pointer;padding:3px">Cancelar</button>
   </div>
 </div>
 
@@ -1104,6 +1113,12 @@ map.on('click',function(e){
     const el=S.elems[moveId];
     if(el){el.geom.lat=e.latlng.lat;el.geom.lng=e.latlng.lng;addHist('Config',`Movió "${el.name}"`);}
     moveMode=false;moveId=null;setBanner(null);renderAll();renderCfg();save();
+    return;
+  }
+  // Detectar elementos cercanos al click
+  if(!connMode){
+    const nearby=findNearby(e.latlng, e.containerPoint);
+    if(nearby.length>1) showPicker(nearby, e.containerPoint);
   }
 });
 
@@ -1411,6 +1426,60 @@ function schNodeClick(id){
     setTimeout(()=>askTog(id),100);
   }
 }
+
+
+// ── ELEMENT PICKER ─────────────────────────────────────────
+function findNearby(latlng, px){
+  const RADIUS=30; // pixels
+  return Object.values(S.elems).filter(el=>{
+    if(!el.geom)return false;
+    try{
+      const p=map.latLngToContainerPoint([el.geom.lat,el.geom.lng]);
+      const dx=p.x-px.x, dy=p.y-px.y;
+      return Math.sqrt(dx*dx+dy*dy)<=RADIUS;
+    }catch(e){return false;}
+  });
+}
+
+function showPicker(els, px){
+  const pop=document.getElementById('m-pick');
+  const list=document.getElementById('m-pick-list');
+  list.innerHTML=els.map(el=>{
+    const ti=T[el.type]||{ico:'?',lbl:el.type};
+    const ms=T[el.type]?.valve;
+    const stateStr=ms?(el.on?' · <span style="color:var(--green2)">ABIERTA</span>':' · <span style="color:var(--red)">CERRADA</span>'):'';
+    return `<div onclick="pickElem('${el.id}')" style="padding:7px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .12s" 
+      onmouseover="this.style.background='var(--surf2)'" onmouseout="this.style.background='transparent'">
+      <span style="font-size:14px">${ti.ico}</span>
+      <div>
+        <div style="font-size:12px;font-weight:500;color:var(--txt)">${el.name}${stateStr}</div>
+        <div style="font-size:9px;font-family:var(--mono);color:var(--txt2)">${ti.lbl}${el.sistema?' · S'+el.sistema:''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Position popup near click, keep inside viewport
+  const W=window.innerWidth, H=window.innerHeight;
+  let x=px.x+10, y=px.y+10;
+  if(x+200>W)x=px.x-210;
+  if(y+280>H)y=Math.max(10,H-290);
+  pop.style.left=x+'px';
+  pop.style.top=y+'px';
+  pop.style.display='block';
+}
+
+function pickElem(id){
+  document.getElementById('m-pick').style.display='none';
+  if(connMode){handleConn(id);return;}
+  const el=S.elems[id];if(!el)return;
+  if(T[el.type]?.valve) askTog(id);
+}
+
+// Close picker on outside click
+document.addEventListener('click',function(e){
+  const pop=document.getElementById('m-pick');
+  if(pop&&pop.style.display!=='none'&&!pop.contains(e.target))pop.style.display='none';
+});
 
 // ── INIT ───────────────────────────────────────────────────
 load();
