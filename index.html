@@ -9,6 +9,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -19,7 +22,6 @@
   --blue:#42a5f5;--cyan:#26c6da;
   --mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--cond:'Barlow Condensed',sans-serif;
 }
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap');
 html,body{height:100%;overflow:hidden;background:var(--bg);font-family:var(--sans);color:var(--txt)}
 body{display:flex;flex-direction:column}
 
@@ -204,7 +206,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v39</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v41</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -468,6 +470,29 @@ body{display:flex;flex-direction:column}
   </div>
 </div>
 
+<!-- MODAL: Confirmación genérica -->
+<div class="modal" id="m-confirm">
+  <div class="mbox">
+    <h2 id="mc-title">CONFIRMAR</h2>
+    <p id="mc-msg" style="font-size:13px;color:var(--txt2);margin-bottom:14px;line-height:1.5"></p>
+    <div class="mac">
+      <button class="m-cn" onclick="closeM('m-confirm');_confirmCb=null">Cancelar</button>
+      <button class="m-dn" id="mc-ok" onclick="if(_confirmCb){_confirmCb();_confirmCb=null;}closeM('m-confirm')">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Alerta genérica -->
+<div class="modal" id="m-alert">
+  <div class="mbox">
+    <h2 id="ma-title">AVISO</h2>
+    <p id="ma-msg" style="font-size:13px;color:var(--txt2);margin-bottom:14px;line-height:1.5"></p>
+    <div class="mac">
+      <button class="m-ok" onclick="closeM('m-alert')">Aceptar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: PIN -->
 <div class="modal" id="m-pin">
   <div class="mbox">
@@ -574,7 +599,14 @@ function load(){
   }catch(e){}
 }
 function save(){
-  try{localStorage.setItem(LS,JSON.stringify({elems:S.elems,conns:S.conns,hist:S.hist}));}catch(e){}
+  try{
+    localStorage.setItem(LS,JSON.stringify({elems:S.elems,conns:S.conns,hist:S.hist}));
+  }catch(e){
+    if(e.name==='QuotaExceededError'||e.code===22||e.code===1014){
+      setBanner('⚠ Sin espacio en almacenamiento — exportá el JSON como respaldo ahora','#7b1f1f');
+      setTimeout(()=>setBanner(null),8000);
+    }
+  }
 }
 
 // ── MAP ────────────────────────────────────────────────────
@@ -782,7 +814,7 @@ function renderAll(){
       const ss=el.salidas?` · ${el.salidas} sal`:'';
       m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
     }
-    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);else if(ti.valve)askTog(el.id);});
+    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(el.type==='potrero'&&el.geom.type==='Point')showEdit(el.id);else if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);else if(ti.valve)askTog(el.id);});
     m.addTo(elemL);
   });
   renderLlaves(energized,watered);
@@ -978,10 +1010,11 @@ function delAllConns(){
   });
   if(!toDelete.length)return;
   const label=f==='all'?'TODAS las conexiones':`las conexiones del filtro "${f.toUpperCase()}"`;
-  if(!confirm(`¿Eliminar ${label}? (${toDelete.length} conexiones)`))return;
   const ids=new Set(toDelete.map(c=>c.id));
-  S.conns=S.conns.filter(c=>!ids.has(c.id));
-  renderAll();renderCfg();save();
+  showConfirm(`¿Eliminar ${label}? (${toDelete.length} conexiones)`,function(){
+    S.conns=S.conns.filter(c=>!ids.has(c.id));
+    renderAll();renderCfg();save();
+  },'BORRAR CONEXIONES');
 }
 
 function renderAllWithFilter(){
@@ -1026,7 +1059,7 @@ function renderAllWithFilter(){
       const ss=el.salidas?` · ${el.salidas} sal`:'';
       m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
     }
-    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);else if(ti.valve)askTog(el.id);});
+    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(el.type==='potrero'&&el.geom.type==='Point')showEdit(el.id);else if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);else if(ti.valve)askTog(el.id);});
     m.addTo(elemL);
   });
   renderLlaves(energized,watered);renderInfra();renderStats(energized,watered);updateHdr(energized,watered);
@@ -1075,7 +1108,7 @@ function saveElem(){
   const sist=parseInt(document.getElementById('me-sist').value);
   const on=document.getElementById('me-on').value==='1';
   const salidas=JUNC.includes(type)?parseInt(document.getElementById('me-sal').value):null;
-  if(!name){alert('Ingrese un nombre');return;}
+  if(!name){showAlert('Ingresá un nombre para el elemento.','NOMBRE REQUERIDO');return;}
   const ex=S.elems[id];
   const ll=document._ll;
   const dg=pendingGeom?pendingGeom:ll?{type:'Point',lat:ll.lat,lng:ll.lng}:{type:'Point',lat:map.getCenter().lat,lng:map.getCenter().lng};
@@ -1094,15 +1127,20 @@ function saveElem(){
 
 function delFromModal(){
   const id=document.getElementById('me-id').value;
-  if(!id||!confirm('¿Eliminar?'))return;
-  delete S.elems[id];S.conns=S.conns.filter(c=>c.from!==id&&c.to!==id);
-  closeM('m-elem');renderAll();renderCfg();save();
+  if(!id)return;
+  const nombre=S.elems[id]?.name||'este elemento';
+  showConfirm(`¿Eliminar "${nombre}"? También se borrarán sus conexiones.`,function(){
+    delete S.elems[id];S.conns=S.conns.filter(c=>c.from!==id&&c.to!==id);
+    closeM('m-elem');renderAll();renderCfg();save();
+  },'ELIMINAR ELEMENTO');
 }
 
 function delElem(id){
-  if(!confirm('¿Eliminar elemento?'))return;
-  delete S.elems[id];S.conns=S.conns.filter(c=>c.from!==id&&c.to!==id);
-  renderAll();renderCfg();save();
+  const nombre=S.elems[id]?.name||'este elemento';
+  showConfirm(`¿Eliminar "${nombre}"? También se borrarán sus conexiones.`,function(){
+    delete S.elems[id];S.conns=S.conns.filter(c=>c.from!==id&&c.to!==id);
+    renderAll();renderCfg();save();
+  },'ELIMINAR ELEMENTO');
 }
 
 function delConn(id){askPIN('Borrar conexion',function(){S.conns=S.conns.filter(function(c){return c.id!==id;});renderAll();renderCfg();save();});}
@@ -1165,7 +1203,7 @@ function cancelDraw(){
 }
 
 function finishDraw(){
-  if(drawPts.length<3){alert('Mínimo 3 puntos');return;}
+  if(drawPts.length<3){showAlert('Necesitás al menos 3 puntos para crear un potrero.','PUNTOS INSUFICIENTES');return;}
   const coords=drawPts.map(p=>[p.lat,p.lng]);
   const lat=coords.reduce((s,c)=>s+c[0],0)/coords.length;
   const lng=coords.reduce((s,c)=>s+c[1],0)/coords.length;
@@ -1215,7 +1253,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')exitAll();});
 // ── GPS ────────────────────────────────────────────────────
 function togGPS(){
   const b=document.getElementById('btn-gps');
-  if(!navigator.geolocation){alert('GPS no disponible');return;}
+  if(!navigator.geolocation){showAlert('El GPS no está disponible en este dispositivo o navegador.','GPS NO DISPONIBLE');return;}
   if(gpsWatchId!==null){
     navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;
     if(gpsMarker){map.removeLayer(gpsMarker);gpsMarker=null;}
@@ -1236,7 +1274,7 @@ function togGPS(){
       if(acc<200)gpsCircle=L.circle([lat,lng],{radius:acc,color:'#26c6da',fillColor:'#26c6da',weight:1,fillOpacity:.07}).addTo(map);
       detectPot(lat,lng,acc);
     },
-    ()=>{b.textContent='📍 Mi ubicación';b.classList.remove('active');gpsWatchId=null;alert('No se pudo obtener GPS');},
+    ()=>{b.textContent='📍 Mi ubicación';b.classList.remove('active');gpsWatchId=null;showAlert('No se pudo obtener la ubicación GPS. Verificá los permisos del navegador.','ERROR DE GPS');},
     {enableHighAccuracy:true,maximumAge:5000,timeout:15000}
   );
 }
@@ -1297,10 +1335,10 @@ async function importKMZ(inp){
   let kml;
   try{
     if(f.name.toLowerCase().endsWith('.kml'))kml=await f.text();
-    else{const z=await JSZip.loadAsync(f);const kf=Object.values(z.files).find(x=>x.name.endsWith('.kml'));if(!kf){alert('Sin KML');return;}kml=await kf.async('text');}
-  }catch(e){alert('Error: '+e.message);return;}finally{inp.value='';}
+    else{const z=await JSZip.loadAsync(f);const kf=Object.values(z.files).find(x=>x.name.endsWith('.kml'));if(!kf){showAlert('El archivo KMZ no contiene ningún archivo KML interno.','ARCHIVO INVÁLIDO');return;}kml=await kf.async('text');}
+  }catch(e){showAlert('Error al leer el archivo: '+e.message,'ERROR DE IMPORTACIÓN');return;}finally{inp.value='';}
   const feats=parseKML(kml);
-  if(!feats.length){alert('Sin elementos con geometría');return;}
+  if(!feats.length){showAlert('El archivo no contiene elementos con geometría reconocible.','SIN GEOMETRÍA');return;}
   baseL.clearLayers();
   feats.forEach(f=>{
     if(f.geom.type==='Polygon')L.polygon(f.geom.coords,{color:'#111',weight:1,fillOpacity:0.04,opacity:0.55}).bindTooltip(f.name).addTo(baseL);
@@ -1375,15 +1413,34 @@ async function importJSON(inp){
     if(d.elems)Object.assign(S.elems,d.elems);
     if(d.conns)S.conns.push(...d.conns);
     if(d.hist)S.hist.push(...d.hist);
-    renderAll();save();alert('Importado: '+Object.keys(S.elems).length+' elementos');
-  }catch(e){alert('Error: '+e.message);}
+    renderAll();save();showAlert('Importación exitosa: '+Object.keys(S.elems).length+' elementos cargados.','IMPORTACIÓN COMPLETA');
+  }catch(e){showAlert('Error al leer el archivo JSON: '+e.message,'ERROR DE IMPORTACIÓN');}
   inp.value='';
 }
-function changePIN(){askPIN('Ingresa PIN actual',function(){var np=prompt('Nuevo PIN (4 digitos):','');if(!np||!/^[0-9]{4}$/.test(np)){alert('El PIN debe tener 4 digitos numericos');return;}localStorage.setItem(PIN_KEY,np);alert('PIN actualizado a: '+np);});}
-function resetAll(){if(!confirm('¿Borrar todo?'))return;Object.keys(S.elems).forEach(k=>delete S.elems[k]);S.conns.length=0;S.hist.length=0;baseL.clearLayers();renderAll();renderCfg();save();}
+function changePIN(){askPIN('Ingresa PIN actual',function(){
+  const np=prompt('Nuevo PIN (4 dígitos):','');
+  if(!np||!/^[0-9]{4}$/.test(np)){showAlert('El PIN debe ser exactamente 4 dígitos numéricos.','PIN INVÁLIDO');return;}
+  localStorage.setItem(PIN_KEY,np);
+  showAlert('PIN actualizado correctamente.','PIN CAMBIADO');
+});}
+function resetAll(){showConfirm('¿Borrar TODOS los elementos, conexiones e historial? Esta acción no se puede deshacer.',function(){Object.keys(S.elems).forEach(k=>delete S.elems[k]);S.conns.length=0;S.hist.length=0;baseL.clearLayers();renderAll();renderCfg();save();},'BORRAR TODO');}
 
 // ── MODAL ──────────────────────────────────────────────────
 function closeM(id){document.getElementById(id).classList.remove('on');}
+
+// ── DIÁLOGOS PROPIOS (reemplazan confirm/alert nativos) ────
+let _confirmCb=null;
+function showConfirm(msg,cb,title){
+  _confirmCb=cb;
+  document.getElementById('mc-title').textContent=title||'CONFIRMAR';
+  document.getElementById('mc-msg').textContent=msg;
+  document.getElementById('m-confirm').classList.add('on');
+}
+function showAlert(msg,title){
+  document.getElementById('ma-title').textContent=title||'AVISO';
+  document.getElementById('ma-msg').textContent=msg;
+  document.getElementById('m-alert').classList.add('on');
+}
 
 
 // ── SCHEMA / RED ───────────────────────────────────────────
@@ -1559,7 +1616,8 @@ function pickElem(id){
   document.getElementById('m-pick').style.display='none';
   if(connMode){handleConn(id);return;}
   const el=S.elems[id];if(!el)return;
-  if(JUNC.includes(el.type)&&el.outlets) showJunc(id);
+  if(el.type==='potrero'&&el.geom.type==='Point') showEdit(id);
+  else if(JUNC.includes(el.type)&&el.outlets) showJunc(id);
   else if(T[el.type]?.valve) askTog(id);
 }
 
