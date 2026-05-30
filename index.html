@@ -193,7 +193,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v32</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v33</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -411,6 +411,24 @@ body{display:flex;flex-direction:column}
   </div>
 </div>
 
+<!-- MODAL: PIN -->
+<div class="modal" id="m-pin">
+  <div class="mbox">
+    <h2>🔐 CONFIRMAR BORRADO</h2>
+    <p style="font-size:12px;color:var(--txt2);margin-bottom:12px" id="pin-desc"></p>
+    <label>PIN de 4 dígitos</label>
+    <input id="pin-input" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
+      style="font-size:22px;letter-spacing:10px;text-align:center"
+      oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+      onkeydown="if(event.key==='Enter')confirmPIN()">
+    <p id="pin-err" style="color:var(--red);font-size:11px;margin-top:6px;min-height:16px"></p>
+    <div class="mac">
+      <button class="m-cn" onclick="closeM('m-pin');pinCb=null">Cancelar</button>
+      <button class="m-dn" onclick="confirmPIN()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
@@ -450,6 +468,23 @@ let pendingGeom=null,pendingFeats=[],featIdx=0;
 let togPending=null;
 const S={elems:{},conns:[],hist:[]};
 const LS='mhe_v1';
+const PIN_KEY='mhe_pin';
+let pinCb=null;
+function getPin(){return localStorage.getItem(PIN_KEY)||'1234';}
+function askPIN(desc,cb){
+  document.getElementById('pin-desc').textContent=desc;
+  document.getElementById('pin-input').value='';
+  document.getElementById('pin-err').textContent='';
+  pinCb=cb;
+  document.getElementById('m-pin').classList.add('on');
+  setTimeout(()=>document.getElementById('pin-input').focus(),150);
+}
+function confirmPIN(){
+  const v=document.getElementById('pin-input').value;
+  if(v===getPin()){closeM('m-pin');if(pinCb)pinCb();pinCb=null;}
+  else{document.getElementById('pin-err').textContent='PIN incorrecto';document.getElementById('pin-input').value='';document.getElementById('pin-input').focus();}
+}
+
 function uid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5)}
 
 // ── BACKUP SEED ────────────────────────────────────────────
@@ -934,7 +969,7 @@ function delElem(id){
   renderAll();renderCfg();save();
 }
 
-function delConn(id){S.conns=S.conns.filter(c=>c.id!==id);renderAll();renderCfg();save();}
+function delConn(id){askPIN('Borrar conexion',function(){S.conns=S.conns.filter(function(c){return c.id!==id;});renderAll();renderCfg();save();});}
 
 // ── MODES ──────────────────────────────────────────────────
 function startAddMode(){
@@ -1202,6 +1237,7 @@ async function importJSON(inp){
   }catch(e){alert('Error: '+e.message);}
   inp.value='';
 }
+function changePIN(){askPIN('Ingresa PIN actual',function(){var np=prompt('Nuevo PIN (4 digitos):','');if(!np||!/^[0-9]{4}$/.test(np)){alert('El PIN debe tener 4 digitos numericos');return;}localStorage.setItem(PIN_KEY,np);alert('PIN actualizado a: '+np);});}
 function resetAll(){if(!confirm('¿Borrar todo?'))return;Object.keys(S.elems).forEach(k=>delete S.elems[k]);S.conns.length=0;S.hist.length=0;baseL.clearLayers();renderAll();renderCfg();save();}
 
 // ── MODAL ──────────────────────────────────────────────────
