@@ -206,7 +206,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v42</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v43</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -360,6 +360,7 @@ body{display:flex;flex-direction:column}
     <label>Nombre</label><input id="me-name" type="text" placeholder="Ej: Llave Norte">
     <label>Tipo</label>
     <select id="me-type" onchange="onType()">
+      <option value="" disabled>— Elegir tipo —</option>
       <optgroup label="─ Eléctrico ─">
         <option value="energizador">⚡ Energizador</option>
         <option value="llave_elec">🔌 Llave Eléctrica</option>
@@ -393,7 +394,7 @@ body{display:flex;flex-direction:column}
     <label>Estado</label>
     <select id="me-on"><option value="1">Activo / Abierta</option><option value="0">Inactivo / Cerrada</option></select>
     <div class="mac">
-      <button class="m-cn" onclick="closeM('m-elem')">Cancelar</button>
+      <button class="m-cn" onclick="document._snapConn=null;closeM('m-elem')">Cancelar</button>
       <button class="m-dn" id="me-del" style="display:none" onclick="delFromModal()">🗑</button>
       <button class="m-ok" onclick="saveElem()">Guardar</button>
     </div>
@@ -936,31 +937,11 @@ function renderCfg(){
   const el=Object.values(S.elems);
   document.getElementById('cfg-ec').textContent=el.length;
   document.getElementById('cfg-cc').textContent=S.conns.length;
-
-  // Separar puntos sin clasificar (potrero/Point) del resto
-  const sinClas=el.filter(e=>e.type==='potrero'&&e.geom.type==='Point');
-  const resto=el.filter(e=>!(e.type==='potrero'&&e.geom.type==='Point'));
-
-  let html='';
-
-  if(sinClas.length){
-    html+=`<div style="background:rgba(255,179,0,.1);border:1px solid rgba(255,179,0,.35);border-radius:5px;padding:6px 8px;margin-bottom:8px">
-      <div style="font-family:var(--cond);font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--amber);margin-bottom:6px">⚠ SIN CLASIFICAR (${sinClas.length})</div>
-      ${sinClas.map(e=>`<div class="cei" style="background:rgba(255,179,0,.06);border-radius:3px;padding:4px 6px;margin-bottom:3px;border-bottom:none">
-        <span class="cei-ico">❓</span>
-        <span class="cei-n" style="color:var(--amber)">${e.name} <span style="font-size:9px;font-family:var(--mono);color:var(--txt2)">[punto sin tipo]</span></span>
-        <span><button onclick="showEdit('${e.id}')" style="background:rgba(255,179,0,.2);border-radius:3px;padding:2px 6px;color:var(--amber);opacity:1;font-size:10px">✏ Editar</button><button onclick="startMove('${e.id}')">📍</button><button onclick="delElem('${e.id}')">🗑</button></span>
-      </div>`).join('')}
-    </div>`;
-  }
-
-  html+=resto.length?resto.map(e=>`<div class="cei">
+  document.getElementById('cfg-el').innerHTML=el.length?el.map(e=>`<div class="cei">
     <span class="cei-ico">${T[e.type]?.ico||'?'}</span>
     <span class="cei-n">${e.name} <span style="color:var(--txt3);font-size:9px">[${T[e.type]?.lbl||e.type}]</span></span>
     <span><button onclick="showEdit('${e.id}')">✏️</button><button onclick="startMove('${e.id}')">📍</button><button onclick="delElem('${e.id}')">🗑</button></span>
-  </div>`).join(''):'';
-
-  document.getElementById('cfg-el').innerHTML=html||'<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';
+  </div>`).join(''):'<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';
   renderConnList();
 }
 
@@ -1111,7 +1092,12 @@ function showEdit(id){
   document.getElementById('me-title').textContent='EDITAR ELEMENTO';
   document.getElementById('me-id').value=id;
   document.getElementById('me-name').value=el.name;
-  document.getElementById('me-type').value=el.type;
+  // Si es potrero/Point (sin clasificar), no pre-cargar tipo para forzar elección manual
+  if(el.type==='potrero'&&el.geom.type==='Point'){
+    document.getElementById('me-type').value='';
+  } else {
+    document.getElementById('me-type').value=el.type;
+  }
   document.getElementById('me-sist').value=el.sistema||1;
   document.getElementById('me-on').value=el.on?'1':'0';
   if(el.salidas)document.getElementById('me-sal').value=el.salidas;
@@ -1129,6 +1115,7 @@ function saveElem(){
   const on=document.getElementById('me-on').value==='1';
   const salidas=JUNC.includes(type)?parseInt(document.getElementById('me-sal').value):null;
   if(!name){showAlert('Ingresá un nombre para el elemento.','NOMBRE REQUERIDO');return;}
+  if(!type){showAlert('Elegí un tipo para el elemento.','TIPO REQUERIDO');return;}
   const ex=S.elems[id];
   const ll=document._ll;
   const dg=pendingGeom?pendingGeom:ll?{type:'Point',lat:ll.lat,lng:ll.lng}:{type:'Point',lat:map.getCenter().lat,lng:map.getCenter().lng};
@@ -1141,8 +1128,14 @@ function saveElem(){
     }
   }
   S.elems[id]={id,type,name,sistema:sist,on,salidas,outlets,geom:ex?.geom||dg,fromKMZ:ex?.fromKMZ||false};
+  // Si se colocó sobre una conexión existente, insertar en ella
+  const snap=document._snapConn;
+  if(snap&&!ex&&S.conns.find(c=>c.id===snap.id)){
+    insertInConn(id,snap);
+  }
+  document._snapConn=null;
   pendingGeom=null;document._ll=null;
-  closeM('m-elem');renderAll();save();
+  closeM('m-elem');renderAll();renderCfg();save();
 }
 
 function delFromModal(){
@@ -1239,6 +1232,40 @@ function finishDraw(){
 }
 
 // ── MAP CLICK ──────────────────────────────────────────────
+// ── SNAP A LÍNEA: detecta si un punto cae sobre una conexión existente ─────
+function findConnOnPoint(latlng, pxClick){
+  const SNAP_PX=14; // píxeles de tolerancia sobre la línea
+  for(const c of S.conns){
+    const a=S.elems[c.from],b=S.elems[c.to];
+    if(!a||!b)continue;
+    const pa=map.latLngToContainerPoint([a.geom.lat,a.geom.lng]);
+    const pb=map.latLngToContainerPoint([b.geom.lat,b.geom.lng]);
+    const px=pxClick;
+    // Distancia punto-segmento en píxeles
+    const dx=pb.x-pa.x, dy=pb.y-pa.y;
+    const lenSq=dx*dx+dy*dy;
+    if(lenSq===0)continue;
+    let t=((px.x-pa.x)*dx+(px.y-pa.y)*dy)/lenSq;
+    t=Math.max(0,Math.min(1,t));
+    const cx=pa.x+t*dx, cy=pa.y+t*dy;
+    const dist=Math.sqrt((px.x-cx)*(px.x-cx)+(px.y-cy)*(px.y-cy));
+    if(dist<=SNAP_PX) return c;
+  }
+  return null;
+}
+
+// Inserta un elemento recién creado en medio de una conexión existente
+function insertInConn(newId, conn){
+  const el=S.elems[newId];
+  if(!el)return;
+  // Borrar la conexión original
+  S.conns=S.conns.filter(c=>c.id!==conn.id);
+  // Crear dos nuevas: from→nuevo y nuevo→to, misma red
+  S.conns.push({id:uid(),from:conn.from,to:newId,net:conn.net});
+  S.conns.push({id:uid(),from:newId,to:conn.to,net:conn.net});
+  addHist('Config',`Insertó "${el.name}" en conexión`,`${S.elems[conn.from]?.name} ↔ ${S.elems[conn.to]?.name}`);
+}
+
 map.on('click',function(e){
   if(drawMode){
     const pt=e.latlng;
@@ -1253,7 +1280,20 @@ map.on('click',function(e){
     setBanner(`${drawPts.length} vértices — doble clic para cerrar`,'#1a3a0a');
     return;
   }
-  if(addMode){addMode=false;setBanner(null);showAdd(e.latlng);return;}
+  if(addMode){
+    addMode=false;setBanner(null);
+    // Detectar si el click cae sobre una conexión existente
+    const snapConn=findConnOnPoint(e.latlng, e.containerPoint);
+    if(snapConn){
+      // Guardar la conexión para insertarla después de crear el elemento
+      document._snapConn=snapConn;
+      setBanner(`📍 Insertando en línea ${S.elems[snapConn.from]?.name} ↔ ${S.elems[snapConn.to]?.name}`,'#1a4a6b');
+    } else {
+      document._snapConn=null;
+    }
+    showAdd(e.latlng);
+    return;
+  }
   if(moveMode&&moveId){
     const el=S.elems[moveId];
     if(el){el.geom.lat=e.latlng.lat;el.geom.lng=e.latlng.lng;addHist('Config',`Movió "${el.name}"`);}
