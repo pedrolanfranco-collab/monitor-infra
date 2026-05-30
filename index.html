@@ -181,7 +181,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v26</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v27</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -540,9 +540,11 @@ function calcStates(){
 }
 
 function simTog(id){
-  const el=S.elems[id];el.on=!el.on;
-  const after=calcStates();el.on=!el.on;
+  const el=S.elems[id];
   const before=calcStates();
+  el.on=!el.on;
+  const after=calcStates();
+  el.on=!el.on; // restore
   const changes=[];
   Object.values(S.elems).filter(e=>e.type==='potrero'||e.type==='bebedero').forEach(p=>{
     const be=before.energized.has(p.id),ae=after.energized.has(p.id);
@@ -617,8 +619,11 @@ function renderAll(){
       const hE=energized.has(el.id),hW=watered.has(el.id);
       fc=hE&&hW?'#4caf50':!hE&&!hW?'#ef5350':'#ffb300';fo=0.85;
     }
+    if(el.type==='bebedero'){
+      fc=watered.has(el.id)?'#26c6da':'#ef5350';fo=0.85;
+    }
     if(el.geom.type==='Polygon'){
-      L.polygon(el.geom.coords,{color:fc,fillColor:fc,weight:2,fillOpacity:0.15}).addTo(elemL);
+      L.polygon(el.geom.coords,{color:'#000',fillColor:fc,weight:2,fillOpacity:0.15}).addTo(elemL);
     }
     const m=L.circleMarker([el.geom.lat,el.geom.lng],{radius:ms.r,color:fc,fillColor:fc,weight:2,fillOpacity:fo});
     const vs=ti.valve?(el.on?' [ABIERTA]':' [CERRADA]'):'';
@@ -812,8 +817,9 @@ function renderAllWithFilter(){
     const ti=T[el.type];if(!ti)return;
     const ms=MS[el.type]||{r:7,c:'#888'};
     let fc=ms.c,fo=el.on?0.85:0.25;
-    if(el.type==='potrero'){const hE=energized.has(el.id),hW=watered.has(el.id);fc=hE&&hW?'#4caf50':!hE&&!hW?'#ef5350':'#ffb300';fo=0.85;}
-    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:fc,fillColor:fc,weight:2,fillOpacity:0.15}).addTo(elemL);
+    if(el.type==='potrero'){const hE=en2.has(el.id),hW=wa2.has(el.id);fc=hE&&hW?'#4caf50':!hE&&!hW?'#ef5350':'#ffb300';fo=0.85;}
+    if(el.type==='bebedero'){fc=wa2.has(el.id)?'#26c6da':'#ef5350';fo=0.85;}
+    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:'#000',fillColor:fc,weight:2,fillOpacity:0.15}).addTo(elemL);
     const m=L.circleMarker([el.geom.lat,el.geom.lng],{radius:ms.r,color:fc,fillColor:fc,weight:2,fillOpacity:fo});
     const vs=ti.valve?(el.on?' [ABIERTA]':' [CERRADA]'):'';
     const ss=el.salidas?` · ${el.salidas} sal`:'';
@@ -1081,7 +1087,7 @@ async function importKMZ(inp){
   if(!feats.length){alert('Sin elementos con geometría');return;}
   baseL.clearLayers();
   feats.forEach(f=>{
-    if(f.geom.type==='Polygon')L.polygon(f.geom.coords,{color:'#3d5e40',weight:1.5,fillOpacity:0.08}).bindTooltip(f.name).addTo(baseL);
+    if(f.geom.type==='Polygon')L.polygon(f.geom.coords,{color:'#000',weight:1.5,fillOpacity:0.05}).bindTooltip(f.name).addTo(baseL);
     else if(f.geom.type==='LineString')L.polyline(f.geom.coords,{color:'#3d5e40',weight:1.5,opacity:.5}).addTo(baseL);
   });
   try{const all=baseL.getLayers();if(all.length){const b=L.featureGroup(all).getBounds();if(b.isValid())map.fitBounds(b,{padding:[30,30]});}}catch(e){}
