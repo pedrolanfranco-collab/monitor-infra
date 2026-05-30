@@ -207,7 +207,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v48</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v49</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -544,6 +544,7 @@ const T={
   distribuidor_x:{ico:'✚',lbl:'Dist Cruz',    net:'agua'},
   bebedero:    {ico:'🐄',lbl:'Bebedero',      net:'agua'},
   potrero:     {ico:'🌿',lbl:'Potrero',       net:'both'},
+  sin_clasificar:{ico:'❓',lbl:'Sin clasificar',net:'agua'},
 };
 const MS={
   potrero:{r:11,c:'#4caf50'},energizador:{r:9,c:'#ffb300'},llave_elec:{r:7,c:'#ffb300'},
@@ -551,6 +552,7 @@ const MS={
   bomba_solar:{r:8,c:'#aed581'},tanque:{r:8,c:'#1565c0'},llave_agua:{r:7,c:'#42a5f5'},
   llave_t:{r:7,c:'#00acc1'},llave_x:{r:7,c:'#00acc1'},
   distribuidor_t:{r:6,c:'#80cbc4'},distribuidor_x:{r:6,c:'#80cbc4'},bebedero:{r:5,c:'#26c6da'},
+  sin_clasificar:{r:8,c:'#ffb300'},
 };
 const JUNC=['distribuidor_t','distribuidor_x','llave_t','llave_x','poste_t','poste_x'];
 const SIST_T=['energizador','llave_elec','bomba','bomba_solar','tanque','llave_agua','llave_t','llave_x','distribuidor_t','distribuidor_x','poste_t','poste_x'];
@@ -833,7 +835,7 @@ function renderAll(){
       const ss=el.salidas?` · ${el.salidas} sal`:'';
       m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
     }
-    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(el.type==='potrero'&&el.geom.type==='Point')showEdit(el.id);else if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);else if(ti.valve)askTog(el.id);});
+    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(el.type==='potrero'&&el.geom.type==='Point'||el.type==='sin_clasificar')showEdit(el.id);else if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);else if(ti.valve)askTog(el.id);});
     m.addTo(elemL);
   });
   renderLlaves(energized,watered);
@@ -957,7 +959,7 @@ function renderCfg(){
   document.getElementById('cfg-cc').textContent=S.conns.length;
 
   // Sección Sin Clasificar (potrero/Point) — al tope, siempre visible
-  const sinClas=el.filter(e=>e.type==='potrero'&&e.geom.type==='Point');
+  const sinClas=el.filter(e=>e.type==='sin_clasificar'||(e.type==='potrero'&&e.geom.type==='Point'));
   const secSC=document.getElementById('cs-sinclasif');
   if(secSC){
     secSC.style.display=sinClas.length?'block':'none';
@@ -972,7 +974,8 @@ function renderCfg(){
       </div>`).join('');
   }
 
-  document.getElementById('cfg-el').innerHTML=el.length?el.map(e=>`<div class="cei" id="cei-${e.id}">
+  const resto=el.filter(e=>!(e.type==='sin_clasificar'||(e.type==='potrero'&&e.geom.type==='Point')));
+  document.getElementById('cfg-el').innerHTML=resto.length?resto.map(e=>`<div class="cei" id="cei-${e.id}">
     <span class="cei-ico">${T[e.type]?.ico||'?'}</span>
     <span class="cei-n">${e.name} <span style="color:var(--txt3);font-size:9px">[${T[e.type]?.lbl||e.type}]</span></span>
     <span><button onclick="flyToElem('${e.id}')" title="Ver en mapa">🗺</button><button onclick="showEdit('${e.id}')">✏️</button><button onclick="startMove('${e.id}')">📍</button><button onclick="delElem('${e.id}')">🗑</button></span>
@@ -1095,7 +1098,7 @@ function renderAllWithFilter(){
       const ss=el.salidas?` · ${el.salidas} sal`:'';
       m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
     }
-    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(el.type==='potrero'&&el.geom.type==='Point')showEdit(el.id);else if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);else if(ti.valve)askTog(el.id);});
+    m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(el.type==='potrero'&&el.geom.type==='Point'||el.type==='sin_clasificar')showEdit(el.id);else if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);else if(ti.valve)askTog(el.id);});
     m.addTo(elemL);
   });
   renderLlaves(energized,watered);renderInfra();renderStats(energized,watered);updateHdr(energized,watered);
@@ -1124,10 +1127,11 @@ function showAdd(ll){
 
 function showEdit(id){
   const el=S.elems[id];
-  document.getElementById('me-title').textContent='EDITAR ELEMENTO';
+  const sinClas=el.type==='sin_clasificar'||(el.type==='potrero'&&el.geom.type==='Point');
+  document.getElementById('me-title').textContent=sinClas?'CLASIFICAR ELEMENTO':'EDITAR ELEMENTO';
   document.getElementById('me-id').value=id;
   document.getElementById('me-name').value=el.name;
-  document.getElementById('me-type').value=el.type;
+  document.getElementById('me-type').value=sinClas?'':el.type;
   document.getElementById('me-sist').value=el.sistema||1;
   document.getElementById('me-on').value=el.on?'1':'0';
   if(el.salidas)document.getElementById('me-sal').value=el.salidas;
@@ -1375,13 +1379,60 @@ async function importKMZ(inp){
   }catch(e){showAlert('Error al leer el archivo: '+e.message,'ERROR DE IMPORTACIÓN');return;}finally{inp.value='';}
   const feats=parseKML(kml);
   if(!feats.length){showAlert('El archivo no contiene elementos con geometría reconocible.','SIN GEOMETRÍA');return;}
+
+  // Dibujar geometrías de fondo (polígonos y líneas)
   baseL.clearLayers();
   feats.forEach(f=>{
     if(f.geom.type==='Polygon')L.polygon(f.geom.coords,{color:'#111',weight:1,fillOpacity:0.04,opacity:0.55}).bindTooltip(f.name).addTo(baseL);
     else if(f.geom.type==='LineString')L.polyline(f.geom.coords,{color:'#3d5e40',weight:1.5,opacity:.5}).addTo(baseL);
   });
   try{const all=baseL.getLayers();if(all.length){const b=L.featureGroup(all).getBounds();if(b.isValid())map.fitBounds(b,{padding:[30,30]});}}catch(e){}
-  pendingFeats=feats;featIdx=0;showFeat();
+
+  // Autodetectar tipo por nombre y geometría
+  function detectTipo(nombre, geom){
+    const n=nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(geom.type==='Polygon'||/potrero|campo|lote|chacra|parcela/.test(n))return'potrero';
+    if(/tanque|deposito|cisterna|reserv/.test(n))return'tanque';
+    if(/bebedero|toma|abrevad/.test(n))return'bebedero';
+    if(/bomba solar|solar|lorentz|grundfos/.test(n))return'bomba_solar';
+    if(/bomba elec|bomba motor|bomba/.test(n))return'bomba';
+    if(/energizador|electrif|pastoreo elec/.test(n))return'energizador';
+    if(/llave elec|corte elec/.test(n))return'llave_elec';
+    if(/cruz.*llave|llave.*cruz|x.*llave|llave.*x|cross/.test(n))return'llave_x';
+    if(/t.*llave|llave.*t\b|llave y t|t y llave|y y llave/.test(n))return'llave_t';
+    if(/\bcru[zs]\b|distribuidor.*x|\bcruce\b/.test(n))return'distribuidor_x';
+    if(/\bt\b|distribuidor.*t|\bjunction\b/.test(n))return'distribuidor_t';
+    if(/\bllave\b|valvula|válvula|valve|corte|paso/.test(n))return'llave_agua';
+    if(/union|unión|unyon|empalme|conector/.test(n))return'sin_clasificar';
+    return'sin_clasificar';
+  }
+
+  // Importar todos con nombre único
+  let importados=0,renombrados=0;
+  const autoDetectados={};
+  feats.forEach(feat=>{
+    const id=uid();
+    const tipo=detectTipo(feat.name,feat.geom);
+    // Nombre único
+    let nombre=feat.name;
+    const existentes=()=>Object.values(S.elems).map(e=>e.name.trim().toLowerCase());
+    if(existentes().includes(nombre.toLowerCase())){
+      let i=2;while(existentes().includes(`${nombre} (${i})`.toLowerCase()))i++;
+      nombre=`${nombre} (${i})`;renombrados++;
+    }
+    S.elems[id]={id,type:tipo,name:nombre,geom:feat.geom,on:true,sistema:1,fromKMZ:true};
+    autoDetectados[tipo]=(autoDetectados[tipo]||0)+1;
+    importados++;
+  });
+
+  renderAll();renderCfg();save();
+  addHist('Sistema',`KMZ importado — ${importados} elementos`);
+  const sc=Object.values(S.elems).filter(e=>e.type==='sin_clasificar').length;
+  const resumen=Object.entries(autoDetectados).map(([t,n])=>`${n} ${T[t]?.lbl||t}`).join(', ');
+  let msg=`${importados} elementos importados: ${resumen}.`;
+  if(renombrados)msg+=` ${renombrados} renombrados por duplicado.`;
+  if(sc)msg+=` ${sc} sin clasificar — editá desde CONFIG.`;
+  showAlert(msg,'IMPORTACIÓN COMPLETA');
 }
 
 function parseKML(txt){
@@ -1652,7 +1703,7 @@ function pickElem(id){
   document.getElementById('m-pick').style.display='none';
   if(connMode){handleConn(id);return;}
   const el=S.elems[id];if(!el)return;
-  if(el.type==='potrero'&&el.geom.type==='Point') showEdit(id);
+  if(el.type==='potrero'&&el.geom.type==='Point'||el.type==='sin_clasificar') showEdit(id);
   else if(JUNC.includes(el.type)&&el.outlets) showJunc(id);
   else if(T[el.type]?.valve) askTog(id);
 }
