@@ -579,20 +579,8 @@ body{display:flex;flex-direction:column}
   integrity="sha512-XMVd28F1oH/O71fatsZTkNuoKx6eO5If0rZIKbTWNcaGDNp5Yd6QIiGnBqkPQVCdEsQAFN1NTlvv1mFTRgHQ==" crossorigin="anonymous"></script>
 
 <script>
-'use strict';
-
-// ── MAP (declarado primero para evitar ReferenceError con const) ──
-const osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
-const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
-const map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
-map.setView([-31.4,-55.42],13);
-const baseL=L.layerGroup().addTo(map);
-const elemL=L.layerGroup().addTo(map);
-let satOn=false;
-function togLayer(){satOn=!satOn;satOn?map.addLayer(sat)&&map.removeLayer(osm):map.addLayer(osm)&&map.removeLayer(sat);document.getElementById('btn-sat').classList.toggle('active',satOn);}
-
 // ── TIPOS ──────────────────────────────────────────────────
-const T={
+var T={
   energizador:{ico:'⚡',lbl:'Energizador',net:'elec',src:true,valve:true},
   llave_elec:{ico:'🔌',lbl:'Llave Eléc',net:'elec',valve:true},
   bomba:{ico:'🔧',lbl:'Bomba Eléc',net:'elec',valve:true},
@@ -608,9 +596,9 @@ const T={
   bebedero:{ico:'🐄',lbl:'Bebedero',net:'agua'},
   potrero:{ico:'🌿',lbl:'Potrero',net:'both'},
 };
-const JUNC=['distribuidor_t','distribuidor_x','llave_t','llave_x'];
-const SIST_T=['energizador','llave_elec','bomba','llave_agua','bomba_solar','tanque','bebedero','llave_t','llave_x','distribuidor_t','distribuidor_x'];
-const MS={
+var JUNC=['distribuidor_t','distribuidor_x','llave_t','llave_x'];
+var SIST_T=['energizador','llave_elec','bomba','llave_agua','bomba_solar','tanque','bebedero','llave_t','llave_x','distribuidor_t','distribuidor_x'];
+var MS={
   energizador:{r:9,c:'#ffb300'},llave_elec:{r:7,c:'#ff7043'},bomba:{r:8,c:'#ff7043'},
   poste_t:{r:5,c:'#ffd54f'},poste_x:{r:5,c:'#ffd54f'},
   bomba_solar:{r:8,c:'#aed581'},tanque:{r:10,c:'#1565c0'},
@@ -620,20 +608,30 @@ const MS={
 };
 
 // ── STATE ──────────────────────────────────────────────────
-let gpsWatchId=null,gpsMarker=null,gpsCircle=null;
-let connMode=false,connFirst=null;
-let addMode=false,moveMode=false,moveId=null;
-let drawMode=false,drawPts=[],drawLines=[],drawPrev=null;
-let pendingGeom=null,pendingFeats=[],featIdx=0;
-let togPending=null;
-let renameCb=null;
-let confirmCb=null;
-const S={elems:{},conns:[],hist:[]};
-const LS='mhe_v1';
-const PIN_KEY='mhe_pin';
-const BACKUP_KEY='mhe_last_export';
-let pinCb=null;
-let connFilter='all';
+var gpsWatchId=null,gpsMarker=null,gpsCircle=null;
+var connMode=false,connFirst=null;
+var addMode=false,moveMode=false,moveId=null;
+var drawMode=false,drawPts=[],drawLines=[],drawPrev=null;
+var pendingGeom=null,pendingFeats=[],featIdx=0;
+var togPending=null;
+var renameCb=null;
+var confirmCb=null;
+var S={elems:{},conns:[],hist:[]};
+var LS='mhe_v1';
+var PIN_KEY='mhe_pin';
+var BACKUP_KEY='mhe_last_export';
+var pinCb=null;
+var connFilter='all';
+
+// ── MAP ────────────────────────────────────────────────────
+var osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
+var sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
+var map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
+map.setView([-31.4,-55.42],13);
+var baseL=L.layerGroup().addTo(map);
+var elemL=L.layerGroup().addTo(map);
+var satOn=false;
+function togLayer(){satOn=!satOn;satOn?map.addLayer(sat)&&map.removeLayer(osm):map.addLayer(osm)&&map.removeLayer(sat);document.getElementById('btn-sat').classList.toggle('active',satOn);}
 
 // ── CLOCK ──────────────────────────────────────────────────
 setInterval(()=>{
@@ -888,6 +886,7 @@ function confirmTog(){
 
 // ── RENDER MAP ─────────────────────────────────────────────
 function renderAll(){
+  if(!elemL||!baseL)return; // mapa aún no inicializado
   if(document.getElementById('pv-red')?.classList.contains('on'))renderRed();
   const{energized,watered}=calcStates();
   elemL.clearLayers();
@@ -1469,35 +1468,38 @@ function exportJSON(){
 async function importJSON(inp){
   const f=inp.files[0];if(!f)return;
   inp.value='';
-  // Leer con FileReader (compatible con todos los navegadores móviles)
   function readFile(file){
     return new Promise((res,rej)=>{
-      const fr=new FileReader();
-      fr.onload=e=>res(e.target.result);
-      fr.onerror=()=>rej(new Error('No se pudo leer el archivo'));
+      var fr=new FileReader();
+      fr.onload=function(e){res(e.target.result);};
+      fr.onerror=function(){rej(new Error('No se pudo leer el archivo'));};
       fr.readAsText(file,'UTF-8');
     });
   }
   try{
-    let txt;
-    if(typeof f.text==='function'){
-      try{txt=await f.text();}
-      catch(e){txt=await readFile(f);}
-    } else {
-      txt=await readFile(f);
-    }
-    // Limpiar posible BOM
+    var txt;
+    try{txt=await f.text();}catch(e){txt=await readFile(f);}
     txt=txt.replace(/^\uFEFF/,'').trim();
-    const d=JSON.parse(txt);
-    if(!d||typeof d!=='object'||(!d.elems&&!d.conns)){
+    var d=JSON.parse(txt);
+    if(!d||typeof d!=='object'||!d.elems){
       showToast('❌','Archivo inválido','El JSON no tiene el formato esperado (falta "elems").');return;
     }
-    Object.keys(S.elems).forEach(k=>delete S.elems[k]);
+    // Limpiar estado
+    Object.keys(S.elems).forEach(function(k){delete S.elems[k];});
     S.conns.length=0;S.hist.length=0;
-    if(d.elems)Object.assign(S.elems,d.elems);
-    if(d.conns)S.conns.push(...d.conns);
-    if(d.hist)S.hist.push(...d.hist);
-    renderAll();save();
+    Object.assign(S.elems,d.elems);
+    if(d.conns)S.conns.push.apply(S.conns,d.conns);
+    if(d.hist)S.hist.push.apply(S.hist,d.hist);
+    // Guardar primero, luego renderizar
+    save();
+    // Renderizar solo si el mapa ya está listo
+    if(elemL&&baseL){
+      renderAll();
+    } else {
+      // Si el mapa aún no está listo, recargar la página con los nuevos datos ya en localStorage
+      window.location.reload();
+      return;
+    }
     showToast('✅','Importación exitosa',Object.keys(S.elems).length+' elementos · '+S.conns.length+' conexiones cargadas.');
   }catch(e){
     showToast('❌','Error de importación',e.message||'Archivo no reconocido');
@@ -1505,15 +1507,15 @@ async function importJSON(inp){
 }
 
 // ── SCHEMA / RED ───────────────────────────────────────────
-let schScale=1,schTx=10,schTy=10,schDrag=false,schDx=0,schDy=0;
-const svg=document.getElementById('sch-svg');
-const schG=document.getElementById('sch-g');
+var schScale=1,schTx=10,schTy=10,schDrag=false,schDx=0,schDy=0;
+var svg=document.getElementById('sch-svg');
+var schG=document.getElementById('sch-g');
 svg.addEventListener('mousedown',e=>{schDrag=true;schDx=e.clientX-schTx;schDy=e.clientY-schTy;svg.style.cursor='grabbing';});
 svg.addEventListener('mousemove',e=>{if(!schDrag)return;schTx=e.clientX-schDx;schTy=e.clientY-schDy;schG.setAttribute('transform',`translate(${schTx},${schTy}) scale(${schScale})`);});
 svg.addEventListener('mouseup',()=>{schDrag=false;svg.style.cursor='grab';});
 svg.addEventListener('mouseleave',()=>{schDrag=false;svg.style.cursor='grab';});
 svg.addEventListener('wheel',e=>{e.preventDefault();const delta=e.deltaY>0?0.85:1.18;schScale=Math.max(0.3,Math.min(3,schScale*delta));schG.setAttribute('transform',`translate(${schTx},${schTy}) scale(${schScale})`);},{passive:false});
-let lastTouch=null;
+var lastTouch=null;
 svg.addEventListener('touchstart',e=>{if(e.touches.length===1){schDrag=true;lastTouch=e.touches[0];schDx=e.touches[0].clientX-schTx;schDy=e.touches[0].clientY-schTy;}});
 svg.addEventListener('touchmove',e=>{if(!schDrag||e.touches.length!==1)return;e.preventDefault();schTx=e.touches[0].clientX-schDx;schTy=e.touches[0].clientY-schDy;schG.setAttribute('transform',`translate(${schTx},${schTy}) scale(${schScale})`);},{passive:false});
 svg.addEventListener('touchend',()=>{schDrag=false;});
