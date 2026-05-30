@@ -207,7 +207,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v47</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v48</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -637,9 +637,16 @@ function goTab(name,btn){
 
 function flyToElem(id){
   const el=S.elems[id];if(!el||!el.geom)return;
-  const btn=document.querySelector('[onclick*="\'mapa\'"]');
-  if(btn)goTab('mapa',btn);
+  // Centrar mapa sin cambiar de pestaña — el mapa siempre está visible a la izquierda
   map.setView([el.geom.lat,el.geom.lng],17,{animate:true});
+  // Scroll + flash en la fila del panel derecho
+  const fila=document.getElementById('cei-'+id);
+  if(fila){
+    fila.scrollIntoView({behavior:'smooth',block:'center'});
+    fila.style.transition='background .15s';
+    fila.style.background='rgba(66,165,245,.25)';
+    setTimeout(()=>{fila.style.background='';},1200);
+  }
 }
 
 // ── CLOCK ──────────────────────────────────────────────────
@@ -956,7 +963,7 @@ function renderCfg(){
     secSC.style.display=sinClas.length?'block':'none';
     document.getElementById('sinclasif-n').textContent=sinClas.length;
     document.getElementById('sinclasif-list').innerHTML=sinClas.map(e=>`
-      <div style="display:flex;align-items:center;gap:6px;padding:5px 4px;border-top:1px solid rgba(255,179,0,.2)">
+      <div id="cei-${e.id}" style="display:flex;align-items:center;gap:6px;padding:5px 4px;border-top:1px solid rgba(255,179,0,.2)">
         <span style="font-size:13px">❓</span>
         <span style="flex:1;font-size:12px;color:var(--amber);font-weight:600">${e.name}</span>
         <button onclick="flyToElem('${e.id}')" title="Ver en mapa" style="background:rgba(255,255,255,.08);border:1px solid var(--brd);border-radius:4px;color:var(--txt);font-size:12px;padding:3px 7px;cursor:pointer">🗺</button>
@@ -965,7 +972,7 @@ function renderCfg(){
       </div>`).join('');
   }
 
-  document.getElementById('cfg-el').innerHTML=el.length?el.map(e=>`<div class="cei">
+  document.getElementById('cfg-el').innerHTML=el.length?el.map(e=>`<div class="cei" id="cei-${e.id}">
     <span class="cei-ico">${T[e.type]?.ico||'?'}</span>
     <span class="cei-n">${e.name} <span style="color:var(--txt3);font-size:9px">[${T[e.type]?.lbl||e.type}]</span></span>
     <span><button onclick="flyToElem('${e.id}')" title="Ver en mapa">🗺</button><button onclick="showEdit('${e.id}')">✏️</button><button onclick="startMove('${e.id}')">📍</button><button onclick="delElem('${e.id}')">🗑</button></span>
