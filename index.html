@@ -167,6 +167,18 @@ body{display:flex;flex-direction:column}
 .sim li{margin-bottom:2px}
 .feat-inf{background:var(--surf2);border:1px solid var(--brd);border-radius:4px;padding:5px 9px;margin-bottom:8px;font-family:var(--mono);font-size:10px;color:var(--txt2)}
 
+/* POTRERO LABEL */
+.pot-label{
+  background:transparent;border:none;
+}
+.pot-lbl{
+  font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:.3px;text-align:center;white-space:nowrap;
+  padding:2px 5px;border-radius:3px;
+  text-shadow:0 0 4px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.8);
+  pointer-events:none;
+}
+
 /* MOBILE */
 @media(max-width:640px){
   #panel{position:absolute;bottom:0;left:0;right:0;width:100%;height:45%;z-index:300;border-left:none;border-top:2px solid var(--brd2)}
@@ -181,7 +193,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v31</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v32</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -626,10 +638,21 @@ function renderAll(){
     if(el.geom.type==='Polygon'){
       L.polygon(el.geom.coords,{color:'#111',fillColor:fc,weight:1.2,fillOpacity:0.18,opacity:0.7}).addTo(elemL);
     }
-    const m=L.circleMarker([el.geom.lat,el.geom.lng],{radius:ms.r,color:fc,fillColor:fc,weight:2,fillOpacity:fo});
-    const vs=ti.valve?(el.on?' [ABIERTA]':' [CERRADA]'):'';
-    const ss=el.salidas?` · ${el.salidas} sal`:'';
-    m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
+    let m;
+    if(el.type==='potrero'){
+      // Etiqueta con nombre en vez de círculo
+      const icon=L.divIcon({
+        className:'pot-label',
+        html:`<div class="pot-lbl" style="color:${fc}">${el.name}</div>`,
+        iconAnchor:[0,0]
+      });
+      m=L.marker([el.geom.lat,el.geom.lng],{icon,interactive:true});
+    } else {
+      m=L.circleMarker([el.geom.lat,el.geom.lng],{radius:ms.r,color:fc,fillColor:fc,weight:2,fillOpacity:fo});
+      const vs=ti.valve?(el.on?' [ABIERTA]':' [CERRADA]'):'';
+      const ss=el.salidas?` · ${el.salidas} sal`:'';
+      m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
+    }
     m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(ti.valve)askTog(el.id);});
     m.addTo(elemL);
   });
@@ -826,10 +849,20 @@ function renderAllWithFilter(){
     if(el.type==='potrero'){const hE=en2.has(el.id),hW=wa2.has(el.id);fc=hE&&hW?'#4caf50':!hE&&!hW?'#ef5350':'#ffb300';fo=0.85;}
     if(el.type==='bebedero'){fc=wa2.has(el.id)?'#26c6da':'#ef5350';fo=0.85;}
     if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:'#111',fillColor:fc,weight:1.2,fillOpacity:0.18,opacity:0.7}).addTo(elemL);
-    const m=L.circleMarker([el.geom.lat,el.geom.lng],{radius:ms.r,color:fc,fillColor:fc,weight:2,fillOpacity:fo});
-    const vs=ti.valve?(el.on?' [ABIERTA]':' [CERRADA]'):'';
-    const ss=el.salidas?` · ${el.salidas} sal`:'';
-    m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
+    let m;
+    if(el.type==='potrero'){
+      const icon=L.divIcon({
+        className:'pot-label',
+        html:`<div class="pot-lbl" style="color:${fc}">${el.name}</div>`,
+        iconAnchor:[0,0]
+      });
+      m=L.marker([el.geom.lat,el.geom.lng],{icon,interactive:true});
+    } else {
+      m=L.circleMarker([el.geom.lat,el.geom.lng],{radius:ms.r,color:fc,fillColor:fc,weight:2,fillOpacity:fo});
+      const vs=ti.valve?(el.on?' [ABIERTA]':' [CERRADA]'):'';
+      const ss=el.salidas?` · ${el.salidas} sal`:'';
+      m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
+    }
     m.on('click',()=>{if(connMode){handleConn(el.id);return;}if(ti.valve)askTog(el.id);});
     m.addTo(elemL);
   });
