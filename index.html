@@ -437,7 +437,7 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
   <div id="hdr-brand">
     <div>
       <div class="logo">⚡💧 INFRAESTRUCTURA</div>
-      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v16</div>
+      <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v18</div>
     </div>
   </div>
   <div id="tabs">
@@ -467,9 +467,11 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
       <div class="leg-row"><div class="leg-dot" style="background:#ef5350"></div>Sin servicio</div>
       <div class="leg-row"><div class="leg-dot" style="background:#ffb300"></div>Parcial / Eléctrico</div>
       <div class="leg-row"><div class="leg-dot" style="background:#ff7043"></div>Bomba eléctrica</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#ffe082"></div>Poste T / Cruz (eléc)</div>
       <div class="leg-row"><div class="leg-dot" style="background:#aed581"></div>Bomba solar</div>
       <div class="leg-row"><div class="leg-dot" style="background:#1565c0"></div>Tanque</div>
       <div class="leg-row"><div class="leg-dot" style="background:#42a5f5"></div>Llave de agua</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#80cbc4"></div>Distribución T / Cruz</div>
       <div class="leg-row"><div class="leg-dot" style="background:#26c6da"></div>Bebedero</div>
     </div>
   </div>
@@ -567,11 +569,15 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
         <option value="energizador">⚡ Energizador</option>
         <option value="llave_elec">🔌 Llave Eléctrica</option>
         <option value="bomba">🔧 Bomba Eléctrica</option>
+        <option value="poste_t">⊤ Poste T (eléctrico)</option>
+        <option value="poste_x">✚ Poste Cruz (eléctrico)</option>
       </optgroup>
       <optgroup label="─ Sistema de Agua ─">
         <option value="bomba_solar">🌞 Bomba Solar</option>
         <option value="tanque">💧 Tanque</option>
         <option value="llave_agua">🚰 Llave de Agua</option>
+        <option value="distribuidor_t">⊤ Distribución T</option>
+        <option value="distribuidor_x">✚ Distribución Cruz</option>
         <option value="bebedero">🐄 Bebedero</option>
       </optgroup>
       <optgroup label="─ General ─">
@@ -628,11 +634,15 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
         <option value="energizador">⚡ Energizador</option>
         <option value="llave_elec">🔌 Llave Eléctrica</option>
         <option value="bomba">🔧 Bomba Eléctrica</option>
+        <option value="poste_t">⊤ Poste T (eléctrico)</option>
+        <option value="poste_x">✚ Poste Cruz (eléctrico)</option>
       </optgroup>
       <optgroup label="─ Sistema de Agua ─">
         <option value="bomba_solar">🌞 Bomba Solar</option>
         <option value="tanque">💧 Tanque</option>
         <option value="llave_agua">🚰 Llave de Agua</option>
+        <option value="distribuidor_t">⊤ Distribución T</option>
+        <option value="distribuidor_x">✚ Distribución Cruz</option>
         <option value="bebedero">🐄 Bebedero</option>
       </optgroup>
       <optgroup label="─ General ─">
@@ -664,11 +674,15 @@ body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--text
 const TYPES = {
   energizador:  { ico:'⚡', lbl:'Energizador',     color:'#ffb300', net:'elec', src:true   },
   llave_elec:   { ico:'🔌', lbl:'Llave Eléctrica', color:'#ffb300', net:'elec', valve:true },
+  poste_t:      { ico:'⊤',  lbl:'Poste T (eléc)',   color:'#ffe082', net:'elec' },
+  poste_x:      { ico:'✚',  lbl:'Poste Cruz (eléc)', color:'#ffe082', net:'elec' },
   bomba:        { ico:'🔧', lbl:'Bomba Eléctrica', color:'#ff7043', net:'both', valve:true },
   bomba_solar:  { ico:'🌞', lbl:'Bomba Solar',     color:'#aed581', net:'agua', src:true   },
   tanque:       { ico:'💧', lbl:'Tanque',           color:'#1565c0', net:'agua', src:true  },
-  llave_agua:   { ico:'🚰', lbl:'Llave de Agua',   color:'#42a5f5', net:'agua', valve:true },
-  bebedero:     { ico:'🐄', lbl:'Bebedero',         color:'#26c6da', net:'agua' },
+  llave_agua:      { ico:'🚰', lbl:'Llave de Agua',    color:'#42a5f5', net:'agua', valve:true },
+  distribuidor_t:  { ico:'⊤',  lbl:'Distribución T',   color:'#80cbc4', net:'agua' },
+  distribuidor_x:  { ico:'✚',  lbl:'Distribución Cruz', color:'#80cbc4', net:'agua' },
+  bebedero:        { ico:'🐄', lbl:'Bebedero',          color:'#26c6da', net:'agua' },
   potrero:      { ico:'🌿', lbl:'Potrero',          color:'#4caf50', net:'both' },
 };
 
@@ -983,11 +997,15 @@ function renderMap(energized,watered){
       potrero:      { radius:11, color:'#4caf50' },
       energizador:  { radius:9,  color:'#ffb300' },
       llave_elec:   { radius:7,  color:'#ffb300' },
+      poste_t:      { radius:6,  color:'#ffe082' },
+      poste_x:      { radius:6,  color:'#ffe082' },
       bomba:        { radius:8,  color:'#ff7043' },
       bomba_solar:  { radius:8,  color:'#aed581' },  // verde claro
       tanque:       { radius:8,  color:'#1565c0' },
-      llave_agua:   { radius:7,  color:'#42a5f5' },
-      bebedero:     { radius:5,  color:'#26c6da' },
+      llave_agua:      { radius:7,  color:'#42a5f5' },
+      distribuidor_t:  { radius:6,  color:'#80cbc4' },  // verde agua
+      distribuidor_x:  { radius:6,  color:'#80cbc4' },
+      bebedero:        { radius:5,  color:'#26c6da' },
     };
     const ms = MARKER_STYLE[el.type] || { radius:7, color:ti.color };
     let radius = ms.radius;
