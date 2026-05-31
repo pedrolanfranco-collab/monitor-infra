@@ -95,6 +95,8 @@ body{display:flex;flex-direction:column}
 .ei-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ei-sub{font-family:var(--mono);font-size:9px;color:var(--txt2);margin-top:1px}
 .vbtn{padding:5px 10px;border-radius:4px;border:none;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;letter-spacing:.3px}
+.loc-btn{padding:3px 6px;border-radius:4px;border:1px solid var(--brd2);background:transparent;color:var(--txt2);font-size:11px;cursor:pointer;flex-shrink:0;transition:all .15s;line-height:1}
+.loc-btn:hover{background:var(--surf2);border-color:var(--green);color:var(--green2);transform:scale(1.1)}
 .vo{background:rgba(66,165,245,.2);color:var(--blue);border:1px solid rgba(66,165,245,.4)}
 .vc{background:rgba(239,83,80,.2);color:var(--red);border:1px solid rgba(239,83,80,.4)}
 
@@ -218,7 +220,25 @@ body{display:flex;flex-direction:column}
 #backup-warn.show{display:flex}
 #backup-warn button{background:transparent;border:1px solid var(--amber);color:var(--amber);border-radius:3px;padding:2px 8px;font-family:var(--mono);font-size:9px;cursor:pointer}
 
-/* POTRERO LABEL */
+/* LOCATE PULSE */
+@keyframes locatePulse{
+  0%{transform:scale(.5);opacity:1;box-shadow:0 0 0 0 rgba(76,175,80,.8)}
+  70%{transform:scale(1.8);opacity:.4;box-shadow:0 0 0 20px rgba(76,175,80,0)}
+  100%{transform:scale(.5);opacity:1;box-shadow:0 0 0 0 rgba(76,175,80,0)}
+}
+.locate-pulse{
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(76,175,80,.5);border:2px solid #4caf50;
+  animation:locatePulse 1s ease-out infinite;
+}
+.locate-tip{
+  background:var(--surf2)!important;border:1px solid var(--green)!important;
+  color:var(--green2)!important;font-family:var(--cond)!important;
+  font-size:11px!important;font-weight:700!important;
+  padding:3px 8px!important;border-radius:4px!important;
+  white-space:nowrap!important;box-shadow:0 4px 12px rgba(0,0,0,.4)!important;
+}
+.locate-tip::before{border-top-color:var(--green)!important}
 .pot-label{background:transparent;border:none}
 .pot-lbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.3px;text-align:center;white-space:nowrap;padding:2px 5px;border-radius:3px;text-shadow:0 0 4px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.8);pointer-events:none}
 
@@ -248,7 +268,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v45</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v47</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -1020,15 +1040,17 @@ function renderLlaves(en,wa){
         <div style="padding:6px 8px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="showJunc('${el.id}')">
           <span style="font-size:14px">${ti.ico}</span>
           <div style="flex:1"><div style="font-size:12px;font-weight:600">${el.name}</div><div style="font-family:var(--mono);font-size:9px;color:var(--txt2)">${ti.lbl} · S${el.sistema||1} · ${el.outlets.length} salidas</div></div>
+          <button class="loc-btn" onclick="event.stopPropagation();locateElem('${el.id}')" title="Ver en mapa">📍</button>
         </div>
         ${juncRows}
       </div>`;
     }
     const flowing=isSrc?el.on:(ti.net==='agua'?wa:en).has(el.id);
-    return `<div class="ei" onclick="${ti.valve?`askTog('${el.id}')`:''}" style="${ti.valve?'cursor:pointer':''}">
-      <span class="ei-ico">${ti.ico}</span>
-      <div class="ei-info"><div class="ei-name">${el.name}</div><div class="ei-sub">${ti.lbl} · S${el.sistema||1}</div></div>
-      ${ti.valve?`<button class="vbtn ${el.on?'vo':'vc'}">${el.on?'ABIERTA':'CERRADA'}</button>`:''}
+    return `<div class="ei" style="${ti.valve?'cursor:pointer':''}">
+      <span class="ei-ico" onclick="${ti.valve?`askTog('${el.id}')`:''}">${ti.ico}</span>
+      <div class="ei-info" onclick="${ti.valve?`askTog('${el.id}')`:''}" style="cursor:pointer"><div class="ei-name">${el.name}</div><div class="ei-sub">${ti.lbl} · S${el.sistema||1}</div></div>
+      <button class="loc-btn" onclick="event.stopPropagation();locateElem('${el.id}')" title="Ver en mapa">📍</button>
+      ${ti.valve?`<button class="vbtn ${el.on?'vo':'vc'}" onclick="event.stopPropagation();askTog('${el.id}')">${el.on?'ABIERTA':'CERRADA'}</button>`:''}
     </div>`;
   }).join('');
 }
@@ -1045,6 +1067,7 @@ function renderInfra(){
       <div class="ic-ico">${ti.ico}</div>
       <div class="ic-name">${e.name}</div>
       <div class="ic-state" style="color:${active?'var(--green2)':'var(--txt3)'};background:${active?'rgba(76,175,80,.12)':'rgba(255,255,255,.04)'}">${active?'● ACTIVO':'○ INACT.'}</div>
+      <button class="loc-btn" style="margin-top:4px;width:100%" onclick="event.stopPropagation();locateElem('${e.id}')" title="Ver en mapa">📍</button>
     </div>`;
   }).join('');
 }
@@ -1183,56 +1206,75 @@ function saveElem(){
   const isNew=!ex;
   S.elems[id]={id,type,name,sistema:sist,on,salidas,outlets,geom:ex?.geom||dg,fromKMZ:ex?.fromKMZ||false};
   pendingGeom=null;document._ll=null;closeM('m-elem');
-
-  // Auto-insertar en conexión cercana si es T, Cruz o distribuidora y es nuevo
-  if(isNew&&JUNC.includes(type)&&ll){
-    autoInsertInConn(id,ll);
+  // Auto-insertar en conexión existente si es T/Cruz nueva colocada en el mapa
+  if(isNew && JUNC.includes(type) && ll){
+    autoInsertInConn(id, ll);
   }
-
   renderAll();save();
 }
 
-// Insertar automáticamente un nodo T/Cruz en una conexión existente cercana
-function autoInsertInConn(newId, ll){
-  var el=S.elems[newId];
-  if(!el||!ll)return;
-  var net=(T[el.type]||{}).net||'agua';
-  // Buscar la conexión más cercana del mismo tipo de red
-  var SNAP_M=60; // metros de tolerancia
-  var best=null,bestDist=SNAP_M;
-  S.conns.forEach(function(c){
-    if(c.net!==net&&!(c.net==='both'||net==='both'))return;
-    var a=S.elems[c.from],b=S.elems[c.to];
-    if(!a||!b||!a.geom||!b.geom)return;
-    // Distancia punto-segmento
-    var d=distPointToSegment(ll.lat,ll.lng,a.geom.lat,a.geom.lng,b.geom.lat,b.geom.lng);
-    if(d<bestDist){bestDist=d;best=c;}
+// ── LOCALIZAR ELEMENTO EN MAPA ────────────────────────────
+function locateElem(id){
+  var el=S.elems[id]; if(!el||!el.geom)return;
+  // Ir al tab MAPA
+  document.querySelectorAll('.pv').forEach(function(p){p.classList.remove('on');});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('pv-mapa').classList.add('on');
+  document.querySelector('.tab').classList.add('active');
+  // Centrar mapa
+  var lat=el.geom.lat, lng=el.geom.lng;
+  map.setView([lat,lng],17,{animate:true});
+  // Crear marcador de pulso temporal
+  var ti=T[el.type]||{ico:'?'};
+  var pulseIcon=L.divIcon({
+    className:'',
+    html:'<div class="locate-pulse"></div>',
+    iconSize:[40,40],
+    iconAnchor:[20,20]
   });
-  if(!best)return;
-  // Dividir la conexión: best se parte en (from→new) y (new→to)
-  var fromId=best.from,toId=best.to,connNet=best.net;
-  // Eliminar la conexión original
-  S.conns=S.conns.filter(function(c){return c.id!==best.id;});
-  // Crear dos conexiones nuevas
-  S.conns.push({id:uid(),from:fromId,to:newId,net:connNet});
-  S.conns.push({id:uid(),from:newId,to:toId,net:connNet});
-  addHist('Auto','Insertó "'+S.elems[newId].name+'" en conexión existente',''+S.elems[fromId]?.name+' ↔ '+S.elems[toId]?.name);
-  showToast('🔗','Insertado en red','"'+S.elems[newId].name+'" fue conectado automáticamente en la línea existente.');
+  var pulse=L.marker([lat,lng],{icon:pulseIcon,zIndexOffset:2000}).addTo(map);
+  // Tooltip con nombre
+  pulse.bindTooltip(ti.ico+' '+el.name,{permanent:true,direction:'top',offset:[0,-22],className:'locate-tip'}).openTooltip();
+  // Eliminar después de 3 segundos
+  setTimeout(function(){map.removeLayer(pulse);},3000);
+}
+// Distancia metros de punto P al segmento A-B
+function distPtoSeg(plat,plng,alat,alng,blat,blng){
+  var cos=Math.cos(plat*Math.PI/180);
+  var R=111320; // metros por grado lat
+  var px=(plng-alng)*cos*R; var py=(plat-alat)*R;
+  var dx=(blng-alng)*cos*R; var dy=(blat-alat)*R;
+  var len2=dx*dx+dy*dy;
+  if(len2===0)return Math.sqrt(px*px+py*py);
+  var t=Math.max(0,Math.min(1,(px*dx+py*dy)/len2));
+  return Math.sqrt(Math.pow(px-t*dx,2)+Math.pow(py-t*dy,2));
 }
 
-// Distancia de un punto (lat,lng) a un segmento (a→b) en metros
-function distPointToSegment(plat,plng,alat,alng,blat,blng){
-  var R=6371000;
-  // Convertir a coordenadas planas aproximadas
-  var cos=Math.cos(plat*Math.PI/180);
-  var px=(plng-alng)*cos*R*Math.PI/180;
-  var py=(plat-alat)*R*Math.PI/180;
-  var dx=(blng-alng)*cos*R*Math.PI/180;
-  var dy=(blat-alat)*R*Math.PI/180;
-  var len2=dx*dx+dy*dy;
-  var t=len2>0?Math.max(0,Math.min(1,(px*dx+py*dy)/len2)):0;
-  var qx=px-t*dx,qy=py-t*dy;
-  return Math.sqrt(qx*qx+qy*qy);
+// Insertar newId en la conexión existente más cercana al punto ll
+function autoInsertInConn(newId, ll){
+  var el=S.elems[newId]; if(!el)return;
+  var elNet=(T[el.type]||{}).net||'agua';
+  var SNAP=80; // metros de tolerancia
+  var best=null, bestDist=SNAP;
+  S.conns.forEach(function(c){
+    // Solo conexiones del mismo tipo de red
+    if(c.net!==elNet && elNet!=='both' && c.net!=='both') return;
+    var a=S.elems[c.from], b=S.elems[c.to];
+    if(!a||!b||!a.geom||!b.geom) return;
+    var d=distPtoSeg(ll.lat,ll.lng,a.geom.lat,a.geom.lng,b.geom.lat,b.geom.lng);
+    if(d<bestDist){bestDist=d;best=c;}
+  });
+  if(!best) return;
+  var fromId=best.from, toId=best.to, net=best.net;
+  var fromName=S.elems[fromId]?S.elems[fromId].name:'?';
+  var toName=S.elems[toId]?S.elems[toId].name:'?';
+  // Eliminar conexión original
+  S.conns=S.conns.filter(function(c){return c.id!==best.id;});
+  // Crear dos conexiones: from→nuevo y nuevo→to
+  S.conns.push({id:uid(),from:fromId,to:newId,net:net});
+  S.conns.push({id:uid(),from:newId,to:toId,net:net});
+  addHist('Auto','Insertó "'+el.name+'" en línea '+fromName+' ↔ '+toName,'Red: '+net);
+  showToast('🔗','Insertado en red','"'+el.name+'" conectado en la línea '+fromName+' ↔ '+toName);
 }
 
 function delFromModal(){
@@ -1324,45 +1366,6 @@ function finishDraw(){
   document.getElementById('me-type').value='potrero';document.getElementById('me-del').style.display='none';
   document._ll=null;onType();document.getElementById('m-elem').classList.add('on');
 }
-
-// ── MAP CLICK ──────────────────────────────────────────────
-map.on('click',function(e){
-  if(drawMode){
-    const pt=e.latlng;
-    if(drawPts.length>=3){
-      const f=drawPts[0];
-      if(map.distance(pt,L.latLng(f.lat,f.lng))<20){finishDraw();return;}
-    }
-    drawPts.push({lat:pt.lat,lng:pt.lng});
-    drawLines.push(L.circleMarker([pt.lat,pt.lng],{radius:4,color:'#fff',fillColor:'#4caf50',fillOpacity:1,weight:1}).addTo(map));
-    if(drawPts.length>1){
-      const prev=drawPts[drawPts.length-2];
-      drawLines.push(L.polyline([[prev.lat,prev.lng],[pt.lat,pt.lng]],{color:'#4caf50',weight:2,dashArray:'5 3'}).addTo(map));
-    }
-    return;
-  }
-  if(addMode){exitAll();showAdd(e.latlng);return;}
-  if(moveMode&&moveId){
-    const el=S.elems[moveId];
-    if(el){el.geom={...el.geom,lat:e.latlng.lat,lng:e.latlng.lng};addHist('Config',`Movió "${el.name}" a nueva posición`);}
-    exitAll();renderAll();renderCfg();save();return;
-  }
-  // Detectar elementos cercanos
-  const near=Object.values(S.elems).filter(el=>{
-    if(!el.geom||el.geom.type==='Polygon')return false;
-    return map.distance(e.latlng,L.latLng(el.geom.lat,el.geom.lng))<30;
-  });
-  if(near.length===1){
-    if(connMode){handleConn(near[0].id);return;}
-    const el=near[0];
-    if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);
-    else if(T[el.type]?.valve)askTog(el.id);
-  } else if(near.length>1){
-    showPicker(near,e.containerPoint);
-  }
-});
-
-map.on('dblclick',function(e){if(drawMode){finishDraw();e.originalEvent.preventDefault();}});
 
 // ── ELEMENT PICKER (múltiples solapados) ───────────────────
 function showPicker(elems,px){
