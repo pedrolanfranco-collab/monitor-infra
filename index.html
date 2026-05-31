@@ -268,7 +268,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v48</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v49</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -1732,8 +1732,8 @@ function renderRed(){
   var curX=16;
   var groupLayouts=[];
 
-  Object.values(groups).sort(function(a,b){return Math.min(...a)-Math.min(...b);}).forEach(function(sistSet){
-    var sistArr=Array.from(sistSet).sort(function(a,b){return a-b;});
+  Object.values(groups).sort(function(a,b){return Math.min.apply(null,a)-Math.min.apply(null,b);}).forEach(function(sistSet){
+    var sistArr=Array.from ? Array.from(sistSet) : Object.keys(sistSet).map(function(k){return sistSet[k];}).sort(function(a,b){return a-b;});
     var groupStartX=curX;
     var groupMaxY=0;
     var sistX=curX;
@@ -1904,7 +1904,7 @@ setTimeout(()=>{
   const pts=Object.values(S.elems).filter(e=>e.geom);
   if(pts.length){
     const lats=pts.map(e=>e.geom.lat),lngs=pts.map(e=>e.geom.lng);
-    const b=L.latLngBounds([Math.min(...lats)-.005,Math.min(...lngs)-.005],[Math.max(...lats)+.005,Math.max(...lngs)+.005]);
+    const b=L.latLngBounds([Math.min.apply(null,lats)-.005,Math.min.apply(null,lngs)-.005],[Math.max.apply(null,lats)+.005,Math.max.apply(null,lngs)+.005]);
     if(b.isValid())map.fitBounds(b,{padding:[40,40]});
   }
 },300);
