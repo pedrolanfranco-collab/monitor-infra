@@ -1136,14 +1136,18 @@ function renderCfg(){
   const el=document.getElementById('cfg-el');
   const items=Object.values(S.elems).sort((a,b)=>a.name.localeCompare(b.name,'es'));
   if(!items.length){el.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';return;}
-  el.innerHTML=items.map(e=>`
-    <div class="cfg-row">
+  el.innerHTML=items.map(e=>{
+    var isJuncType=JUNC.includes(e.type);
+    var juncBtn=isJuncType?`<button onclick="insertExistingInConn('${e.id}')" title="Conectar a línea cercana" style="background:transparent;border:none;color:var(--cyan);font-size:10px;cursor:pointer;font-family:var(--mono)">🔗</button>`:'';
+    return `<div class="cfg-row">
       <span style="font-size:13px">${T[e.type]?.ico||'?'}</span>
       <span style="flex:1;font-size:11px">${e.name}</span>
+      ${juncBtn}
       <button onclick="startMove('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">📍</button>
       <button onclick="showEdit('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">✏️</button>
       <button onclick="delElem('${e.id}')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   const cl=document.getElementById('cfg-cl');
   if(!S.conns.length){cl.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin conexiones</div>';return;}
   cl.innerHTML=S.conns.filter(c=>{
@@ -1239,6 +1243,42 @@ function locateElem(id){
   setTimeout(function(){map.removeLayer(pulse);},3000);
 }
 // Distancia metros de punto P al segmento A-B
+// Conectar un T/Cruz YA EXISTENTE a la línea más cercana
+function insertExistingInConn(id){
+  var el=S.elems[id];
+  if(!el||!el.geom){showToast('⚠️','Sin posición','El elemento no tiene coordenadas.');return;}
+  var ll={lat:el.geom.lat,lng:el.geom.lng};
+  var elNet=(T[el.type]||{}).net||'agua';
+  var SNAP=200;
+  var best=null, bestDist=SNAP;
+  S.conns.forEach(function(c){
+    if(c.from===id||c.to===id)return;
+    if(c.net!==elNet && elNet!=='both' && c.net!=='both')return;
+    var a=S.elems[c.from],b=S.elems[c.to];
+    if(!a||!b||!a.geom||!b.geom)return;
+    var d=distPtoSeg(ll.lat,ll.lng,a.geom.lat,a.geom.lng,b.geom.lat,b.geom.lng);
+    if(d<bestDist){bestDist=d;best=c;}
+  });
+  if(!best){showToast('⚠️','Sin línea cercana','No hay conexiones a menos de 200m.');return;}
+  var fromId=best.from,toId=best.to,net=best.net;
+  var fromName=S.elems[fromId]?S.elems[fromId].name:'?';
+  var toName=S.elems[toId]?S.elems[toId].name:'?';
+  S.conns=S.conns.filter(function(c){return c.id!==best.id;});
+  S.conns.push({id:uid(),from:fromId,to:id,net:net});
+  S.conns.push({id:uid(),from:id,to:toId,net:net});
+  el.on=true;
+  if(el.outlets){
+    var total=S.conns.filter(function(c){return c.from===id||c.to===id;}).length;
+    var needed=Math.max(total,el.salidas||2);
+    while(el.outlets.length<needed)el.outlets.push({open:true,name:'Salida '+(el.outlets.length+1)});
+    el.salidas=needed;
+    el.outlets.forEach(function(o){o.open=true;});
+  }
+  addHist('Config','Conectó "'+el.name+'" en '+fromName+' ↔ '+toName,'Red: '+net);
+  renderAll();renderCfg();save();
+  showToast('✅','Conectado','"'+el.name+'" en '+fromName+' ↔ '+toName+' ('+Math.round(bestDist)+'m)');
+}
+
 function distPtoSeg(plat,plng,alat,alng,blat,blng){
   var cos=Math.cos(plat*Math.PI/180);
   var R=111320; // metros por grado lat
@@ -1265,43 +1305,16 @@ function autoInsertInConn(newId, ll){
     if(d<bestDist){bestDist=d;best=c;}
   });
   if(!best) return;
-
   var fromId=best.from, toId=best.to, net=best.net;
   var fromName=S.elems[fromId]?S.elems[fromId].name:'?';
   var toName=S.elems[toId]?S.elems[toId].name:'?';
-
   // Eliminar conexión original
   S.conns=S.conns.filter(function(c){return c.id!==best.id;});
-
   // Crear dos conexiones: from→nuevo y nuevo→to
   S.conns.push({id:uid(),from:fromId,to:newId,net:net});
   S.conns.push({id:uid(),from:newId,to:toId,net:net});
-
-  // CRÍTICO: asegurar que el nuevo nodo está abierto (on=true)
-  el.on=true;
-
-  // CRÍTICO: si es JUNC, contar cuántas conexiones totales tiene ahora
-  // y asegurar que hay suficientes salidas ABIERTAS para todas
-  if(JUNC.includes(el.type)){
-    // Contar todas las conexiones del nodo (las recién creadas + las previas)
-    var connCount=S.conns.filter(function(c){return c.from===newId||c.to===newId;}).length;
-    var needed=Math.max(connCount, el.salidas||2);
-    // Expandir outlets si hacen falta
-    if(!el.outlets||el.outlets.length<needed){
-      var current=el.outlets||[];
-      var extra=needed-current.length;
-      for(var i=0;i<extra;i++){
-        current.push({open:true,name:'Salida '+(current.length+1)});
-      }
-      el.outlets=current;
-      el.salidas=needed;
-    }
-    // Asegurar que TODAS las salidas están abiertas
-    el.outlets.forEach(function(o){o.open=true;});
-  }
-
   addHist('Auto','Insertó "'+el.name+'" en línea '+fromName+' ↔ '+toName,'Red: '+net);
-  showToast('🔗','Insertado en red','"'+el.name+'" conectado en '+fromName+' ↔ '+toName);
+  showToast('🔗','Insertado en red','"'+el.name+'" conectado en la línea '+fromName+' ↔ '+toName);
 }
 
 function delFromModal(){
