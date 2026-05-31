@@ -937,8 +937,7 @@ function confirmTog(){
 
 // ── RENDER MAP ─────────────────────────────────────────────
 function renderAll(){
-  console.log('[renderAll] elemL:', typeof elemL, elemL ? 'OK' : 'NULL', '/ elems:', Object.keys(S.elems).length);
-  if(!elemL||!baseL){console.warn('[renderAll] SKIP: mapa no listo');return;} // mapa aún no inicializado
+  if(!elemL||!baseL)return; // mapa aún no inicializado
   if(document.getElementById('pv-red')?.classList.contains('on'))renderRed();
   var{energized,watered}=calcStates();
   elemL.clearLayers();
@@ -1275,45 +1274,6 @@ function finishDraw(){
   document.getElementById('me-type').value='potrero';document.getElementById('me-del').style.display='none';
   document._ll=null;onType();document.getElementById('m-elem').classList.add('on');
 }
-
-// ── MAP CLICK ──────────────────────────────────────────────
-map.on('click',function(e){
-  if(drawMode){
-    const pt=e.latlng;
-    if(drawPts.length>=3){
-      const f=drawPts[0];
-      if(map.distance(pt,L.latLng(f.lat,f.lng))<20){finishDraw();return;}
-    }
-    drawPts.push({lat:pt.lat,lng:pt.lng});
-    drawLines.push(L.circleMarker([pt.lat,pt.lng],{radius:4,color:'#fff',fillColor:'#4caf50',fillOpacity:1,weight:1}).addTo(map));
-    if(drawPts.length>1){
-      const prev=drawPts[drawPts.length-2];
-      drawLines.push(L.polyline([[prev.lat,prev.lng],[pt.lat,pt.lng]],{color:'#4caf50',weight:2,dashArray:'5 3'}).addTo(map));
-    }
-    return;
-  }
-  if(addMode){exitAll();showAdd(e.latlng);return;}
-  if(moveMode&&moveId){
-    const el=S.elems[moveId];
-    if(el){el.geom={...el.geom,lat:e.latlng.lat,lng:e.latlng.lng};addHist('Config',`Movió "${el.name}" a nueva posición`);}
-    exitAll();renderAll();renderCfg();save();return;
-  }
-  // Detectar elementos cercanos
-  const near=Object.values(S.elems).filter(el=>{
-    if(!el.geom||el.geom.type==='Polygon')return false;
-    return map.distance(e.latlng,L.latLng(el.geom.lat,el.geom.lng))<30;
-  });
-  if(near.length===1){
-    if(connMode){handleConn(near[0].id);return;}
-    const el=near[0];
-    if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);
-    else if(T[el.type]?.valve)askTog(el.id);
-  } else if(near.length>1){
-    showPicker(near,e.containerPoint);
-  }
-});
-
-map.on('dblclick',function(e){if(drawMode){finishDraw();e.originalEvent.preventDefault();}});
 
 // ── ELEMENT PICKER (múltiples solapados) ───────────────────
 function showPicker(elems,px){
@@ -1721,8 +1681,6 @@ window.addEventListener('DOMContentLoaded', function(){
 })();
 load();
 initSchema();
-console.log('[DIAG] Después de load() - S.elems count:', Object.keys(S.elems).length);
-console.log('[DIAG] map:', typeof map, '/ elemL:', typeof elemL, '/ baseL:', typeof baseL);
 
 // Migración: outlets para junctions sin ellos
 (function migrate(){
