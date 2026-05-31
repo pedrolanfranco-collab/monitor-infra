@@ -579,6 +579,8 @@ body{display:flex;flex-direction:column}
   integrity="sha512-XMVd28F1oH/O71fatsZTkNuoKx6eO5If0rZIKbTWNcaGDNp5Yd6QIiGnBqkPQVCdEsQAFN1NTlvv1mFTRgHQ==" crossorigin="anonymous"></script>
 
 <script>
+window.addEventListener('DOMContentLoaded', function(){
+
 // ── TIPOS ──────────────────────────────────────────────────
 var T={
   energizador:{ico:'⚡',lbl:'Energizador',net:'elec',src:true,valve:true},
@@ -1603,6 +1605,7 @@ setTimeout(()=>{
     if(b.isValid())map.fitBounds(b,{padding:[40,40]});
   }
 },300);
+});
 </script>
 
 <script>
