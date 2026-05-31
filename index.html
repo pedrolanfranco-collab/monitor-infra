@@ -576,7 +576,7 @@ body{display:flex;flex-direction:column}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
 
 <script>
-window.addEventListener('DOMContentLoaded', function(){
+<script>
 
 // ── TIPOS ──────────────────────────────────────────────────
 var T={
@@ -623,15 +623,6 @@ var pinCb=null;
 var connFilter='all';
 
 // ── MAP ────────────────────────────────────────────────────
-var osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
-var sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
-var map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
-map.setView([-31.4,-55.42],13);
-var baseL=L.layerGroup().addTo(map);
-var elemL=L.layerGroup().addTo(map);
-var satOn=false;
-function togLayer(){satOn=!satOn;satOn?map.addLayer(sat)&&map.removeLayer(osm):map.addLayer(osm)&&map.removeLayer(sat);document.getElementById('btn-sat').classList.toggle('active',satOn);}
-
 // ── CLOCK ──────────────────────────────────────────────────
 setInterval(()=>{
   const n=new Date();
@@ -1565,6 +1556,20 @@ function renderRed(){
   });
   schG.innerHTML=html;
 }
+
+</script>
+
+<script>
+window.addEventListener('DOMContentLoaded', function(){
+// ── MAP
+var osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
+var sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
+var map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
+map.setView([-31.4,-55.42],13);
+var baseL=L.layerGroup().addTo(map);
+var elemL=L.layerGroup().addTo(map);
+var satOn=false;
+function togLayer(){satOn=!satOn;satOn?map.addLayer(sat)&&map.removeLayer(osm):map.addLayer(osm)&&map.removeLayer(sat);document.getElementById('btn-sat').classList.toggle('active',satOn);}
 
 // ── INIT ───────────────────────────────────────────────────
 // Seed: solo carga si no hay datos propios en localStorage
