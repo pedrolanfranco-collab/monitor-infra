@@ -10,7 +10,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <!-- SRI agregado -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  crossorigin="anonymous">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -571,12 +572,16 @@ body{display:flex;flex-direction:column}
 </div>
 
 <!-- SRI en Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  crossorigin="anonymous"></script>
 <!-- JSZip con SRI -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+  crossorigin="anonymous"></script>
 
 <script>
-<script>
+// ── VARIABLES GLOBALES DEL MAPA ────────────────────────────
+var osm, sat, map, baseL, elemL, satOn=false;
+function togLayer(){if(!map)return;satOn=!satOn;satOn?(map.addLayer(sat),map.removeLayer(osm)):(map.addLayer(osm),map.removeLayer(sat));var b=document.getElementById('btn-sat');if(b)b.classList.toggle('active',satOn);}
 
 // ── TIPOS ──────────────────────────────────────────────────
 var T={
@@ -623,6 +628,15 @@ var pinCb=null;
 var connFilter='all';
 
 // ── MAP ────────────────────────────────────────────────────
+var osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
+var sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
+var map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
+map.setView([-31.4,-55.42],13);
+var baseL=L.layerGroup().addTo(map);
+var elemL=L.layerGroup().addTo(map);
+var satOn=false;
+function togLayer(){satOn=!satOn;satOn?map.addLayer(sat)&&map.removeLayer(osm):map.addLayer(osm)&&map.removeLayer(sat);document.getElementById('btn-sat').classList.toggle('active',satOn);}
+
 // ── CLOCK ──────────────────────────────────────────────────
 setInterval(()=>{
   const n=new Date();
@@ -1557,21 +1571,35 @@ function renderRed(){
   schG.innerHTML=html;
 }
 
-</script>
 
-<script>
+
+// ── MAP CLICK EVENTS ───────────────────────────────────────
+
+
 window.addEventListener('DOMContentLoaded', function(){
-// ── MAP
-var osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
-var sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
-var map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
-map.setView([-31.4,-55.42],13);
-var baseL=L.layerGroup().addTo(map);
-var elemL=L.layerGroup().addTo(map);
-var satOn=false;
-function togLayer(){satOn=!satOn;satOn?map.addLayer(sat)&&map.removeLayer(osm):map.addLayer(osm)&&map.removeLayer(sat);document.getElementById('btn-sat').classList.toggle('active',satOn);}
-
-// ── INIT ───────────────────────────────────────────────────
+  osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
+  sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
+  map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
+  map.setView([-31.4,-55.42],13);
+  baseL=L.layerGroup().addTo(map);
+  elemL=L.layerGroup().addTo(map);
+  map.on('click',function(e){
+    if(drawMode){
+      var pt=e.latlng;
+      if(drawPts.length>=3){var f=drawPts[0];if(map.distance(pt,L.latLng(f.lat,f.lng))<20){finishDraw();return;}}
+      drawPts.push({lat:pt.lat,lng:pt.lng});
+      drawLines.push(L.circleMarker([pt.lat,pt.lng],{radius:4,color:'#fff',fillColor:'#4caf50',fillOpacity:1,weight:1}).addTo(map));
+      if(drawPts.length>1){var prev=drawPts[drawPts.length-2];drawLines.push(L.polyline([[prev.lat,prev.lng],[pt.lat,pt.lng]],{color:'#4caf50',weight:2,dashArray:'5 3'}).addTo(map));}
+      return;
+    }
+    if(addMode){exitAll();showAdd(e.latlng);return;}
+    if(moveMode&&moveId){var el=S.elems[moveId];if(el){el.geom={...el.geom,lat:e.latlng.lat,lng:e.latlng.lng};addHist('Config','Movió "'+el.name+'" a nueva posición');}exitAll();renderAll();renderCfg();save();return;}
+    var near=Object.values(S.elems).filter(function(el){if(!el.geom||el.geom.type==='Polygon')return false;return map.distance(e.latlng,L.latLng(el.geom.lat,el.geom.lng))<30;});
+    if(near.length===1){if(connMode){handleConn(near[0].id);return;}var el2=near[0];if(JUNC.includes(el2.type)&&el2.outlets)showJunc(el2.id);else if(T[el2.type]&&T[el2.type].valve)askTog(el2.id);}
+    else if(near.length>1){showPicker(near,e.containerPoint);}
+  });
+  map.on('dblclick',function(e){if(drawMode){finishDraw();e.originalEvent.preventDefault();}});
+  // ── INIT ───────────────────────────────────────────────────
 // Seed: solo carga si no hay datos propios en localStorage
 (function(){
   try{
