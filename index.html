@@ -248,7 +248,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v44</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v45</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -642,6 +642,7 @@ body{display:flex;flex-direction:column}
   crossorigin="anonymous"></script>
 
 <script>
+
 // ── VARIABLES GLOBALES DEL MAPA ────────────────────────────
 var osm, sat, map, baseL, elemL, satOn=false;
 function togLayer(){if(!map)return;satOn=!satOn;satOn?(map.addLayer(sat),map.removeLayer(osm)):(map.addLayer(osm),map.removeLayer(sat));var b=document.getElementById('btn-sat');if(b)b.classList.toggle('active',satOn);}
@@ -1275,44 +1276,6 @@ function finishDraw(){
   document._ll=null;onType();document.getElementById('m-elem').classList.add('on');
 }
 
-// ── MAP CLICK ──────────────────────────────────────────────
-map.on('click',function(e){
-  if(drawMode){
-    const pt=e.latlng;
-    if(drawPts.length>=3){
-      const f=drawPts[0];
-      if(map.distance(pt,L.latLng(f.lat,f.lng))<20){finishDraw();return;}
-    }
-    drawPts.push({lat:pt.lat,lng:pt.lng});
-    drawLines.push(L.circleMarker([pt.lat,pt.lng],{radius:4,color:'#fff',fillColor:'#4caf50',fillOpacity:1,weight:1}).addTo(map));
-    if(drawPts.length>1){
-      const prev=drawPts[drawPts.length-2];
-      drawLines.push(L.polyline([[prev.lat,prev.lng],[pt.lat,pt.lng]],{color:'#4caf50',weight:2,dashArray:'5 3'}).addTo(map));
-    }
-    return;
-  }
-  if(addMode){exitAll();showAdd(e.latlng);return;}
-  if(moveMode&&moveId){
-    const el=S.elems[moveId];
-    if(el){el.geom={...el.geom,lat:e.latlng.lat,lng:e.latlng.lng};addHist('Config',`Movió "${el.name}" a nueva posición`);}
-    exitAll();renderAll();renderCfg();save();return;
-  }
-  // Detectar elementos cercanos
-  const near=Object.values(S.elems).filter(el=>{
-    if(!el.geom||el.geom.type==='Polygon')return false;
-    return map.distance(e.latlng,L.latLng(el.geom.lat,el.geom.lng))<30;
-  });
-  if(near.length===1){
-    if(connMode){handleConn(near[0].id);return;}
-    const el=near[0];
-    if(JUNC.includes(el.type)&&el.outlets)showJunc(el.id);
-    else if(T[el.type]?.valve)askTog(el.id);
-  } else if(near.length>1){
-    showPicker(near,e.containerPoint);
-  }
-});
-
-map.on('dblclick',function(e){if(drawMode){finishDraw();e.originalEvent.preventDefault();}});
 
 // ── ELEMENT PICKER (múltiples solapados) ───────────────────
 function showPicker(elems,px){
@@ -1672,7 +1635,15 @@ function renderRed(){
 // ── MAP CLICK EVENTS ───────────────────────────────────────
 
 
+
 window.addEventListener('DOMContentLoaded', function(){
+  // Inicializar Leaflet (requiere DOM listo)
+  osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
+  sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
+  map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
+  map.setView([-31.4,-55.42],13);
+  baseL=L.layerGroup().addTo(map);
+  elemL=L.layerGroup().addTo(map);
   osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
   sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
   map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
@@ -1746,6 +1717,7 @@ setTimeout(()=>{
   }
 },300);
 });
+</script>
 </script>
 
 <script>
