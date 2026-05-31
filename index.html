@@ -268,7 +268,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v53</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v54</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -1376,8 +1376,14 @@ function startMove(id){exitAll();moveMode=true;moveId=id;setBanner(`📍 Tocá l
 function startConn(){exitAll();connMode=true;connFirst=null;setBanner('Modo conexión — tocá el primer elemento');goTab('mapa',document.querySelector('.tab'));}
 
 function handleConn(id){
-  if(!connFirst){connFirst=id;setBanner(`"${S.elems[id].name}" → tocá el segundo elemento`);return;}
-  if(connFirst===id){connFirst=null;setBanner('Tocá el primer elemento');return;}
+  if(!connFirst){connFirst=id;setBanner('"'+S.elems[id].name+'" → tocá el segundo elemento · Toque largo o doble toque para cancelar');return;}
+  // Doble toque en el mismo elemento = cancelar modo conexión
+  if(connFirst===id){
+    exitAll();
+    setBanner('');
+    showToast('✅','Conexión finalizada','Modo conexión desactivado.');
+    return;
+  }
   const a=S.elems[connFirst],b=S.elems[id];
   const wt=['tanque','llave_agua','bebedero','bomba_solar','llave_t','llave_x','distribuidor_t','distribuidor_x'];
   let net='elec';
@@ -1385,9 +1391,10 @@ function handleConn(id){
   if(a.type==='potrero'||b.type==='potrero')net='both';
   if(!S.conns.find(c=>(c.from===connFirst&&c.to===id)||(c.from===id&&c.to===connFirst))){
     S.conns.push({id:uid(),from:connFirst,to:id,net});
-    addHist('Config',`Conectó "${a.name}" ↔ "${b.name}"`,`Red: ${net}`);
+    addHist('Config','Conectó "'+a.name+'" ↔ "'+b.name+'"','Red: '+net);
+    showToast('🔗','Conexión creada','"'+a.name+'" ↔ "'+b.name+'" ['+net+']');
   }
-  connFirst=null;setBanner('Modo conexión — tocá el primer elemento');renderAll();renderCfg();save();
+  connFirst=null;setBanner('Modo conexión — tocá el primer elemento · Tocá el mismo elemento dos veces para salir');renderAll();renderCfg();save();
 }
 
 // ── DRAW ───────────────────────────────────────────────────
@@ -1916,7 +1923,10 @@ window.addEventListener('DOMContentLoaded', function(){
     if(near.length===1){if(connMode){handleConn(near[0].id);return;}var el2=near[0];if(JUNC.includes(el2.type)){if(el2.outlets&&el2.outlets.length>0)showJunc(el2.id);else showToast('⊤','Paso directo','Este elemento no tiene salidas configuradas. Opera como paso directo sin llave.');} else if(T[el2.type]&&T[el2.type].valve)askTog(el2.id);}
     else if(near.length>1){showPicker(near,e.containerPoint);}
   });
-  map.on('dblclick',function(e){if(drawMode){finishDraw();e.originalEvent.preventDefault();}});
+  map.on('dblclick',function(e){
+    if(drawMode){finishDraw();e.originalEvent.preventDefault();return;}
+    if(connMode){exitAll();setBanner('');showToast('✅','Conexión finalizada','Modo conexión desactivado.');e.originalEvent.preventDefault();return;}
+  });
   // ── INIT ───────────────────────────────────────────────────
 (function(){
   try{
