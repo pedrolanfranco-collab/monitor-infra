@@ -268,7 +268,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v49</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v50</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -1817,7 +1817,7 @@ function renderRed(){
     var bc=active?'#4caf50':'#ef5350';
     var bg=active?'rgba(76,175,80,0.15)':'rgba(239,83,80,0.08)';
     var nm=el.name.length>11?el.name.substring(0,10)+'…':el.name;
-    html+='<g style="cursor:pointer" onclick="pickFromRed(''+el.id+'')"><title>'+el.name+' · S'+(el.sistema||1)+'</title>'
+    html+='<g style="cursor:pointer" onclick="pickFromRed(&quot;'+el.id+'&quot;)"><title>'+el.name+' · S'+(el.sistema||1)+'</title>'
       +'<circle cx="'+x+'" cy="'+y+'" r="'+NODE_R+'" fill="'+bg+'" stroke="'+bc+'" stroke-width="'+(active?2:1.2)+'"/>'
       +'<circle cx="'+x+'" cy="'+y+'" r="'+NODE_R+'" fill="none" stroke="'+sc+'" stroke-width="2" stroke-dasharray="3 3" opacity="0.45"/>'
       +'<circle cx="'+(x+NODE_R-4)+'" cy="'+(y-NODE_R+4)+'" r="4" fill="'+bc+'"/>'
