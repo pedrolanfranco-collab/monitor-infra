@@ -1136,18 +1136,14 @@ function renderCfg(){
   const el=document.getElementById('cfg-el');
   const items=Object.values(S.elems).sort((a,b)=>a.name.localeCompare(b.name,'es'));
   if(!items.length){el.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';return;}
-  el.innerHTML=items.map(e=>{
-    var isJuncType=JUNC.includes(e.type);
-    var juncBtn=isJuncType?`<button onclick="insertExistingInConn('${e.id}')" title="Conectar a línea cercana" style="background:transparent;border:none;color:var(--cyan);font-size:10px;cursor:pointer;font-family:var(--mono)">🔗</button>`:'';
-    return `<div class="cfg-row">
+  el.innerHTML=items.map(e=>`
+    <div class="cfg-row">
       <span style="font-size:13px">${T[e.type]?.ico||'?'}</span>
       <span style="flex:1;font-size:11px">${e.name}</span>
-      ${juncBtn}
       <button onclick="startMove('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">📍</button>
       <button onclick="showEdit('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">✏️</button>
       <button onclick="delElem('${e.id}')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>
-    </div>`;
-  }).join('');
+    </div>`).join('');
   const cl=document.getElementById('cfg-cl');
   if(!S.conns.length){cl.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin conexiones</div>';return;}
   cl.innerHTML=S.conns.filter(c=>{
@@ -1243,42 +1239,6 @@ function locateElem(id){
   setTimeout(function(){map.removeLayer(pulse);},3000);
 }
 // Distancia metros de punto P al segmento A-B
-// Conectar un T/Cruz YA EXISTENTE a la línea más cercana
-function insertExistingInConn(id){
-  var el=S.elems[id];
-  if(!el||!el.geom){showToast('⚠️','Sin posición','El elemento no tiene coordenadas.');return;}
-  var ll={lat:el.geom.lat,lng:el.geom.lng};
-  var elNet=(T[el.type]||{}).net||'agua';
-  var SNAP=200;
-  var best=null, bestDist=SNAP;
-  S.conns.forEach(function(c){
-    if(c.from===id||c.to===id)return;
-    if(c.net!==elNet && elNet!=='both' && c.net!=='both')return;
-    var a=S.elems[c.from],b=S.elems[c.to];
-    if(!a||!b||!a.geom||!b.geom)return;
-    var d=distPtoSeg(ll.lat,ll.lng,a.geom.lat,a.geom.lng,b.geom.lat,b.geom.lng);
-    if(d<bestDist){bestDist=d;best=c;}
-  });
-  if(!best){showToast('⚠️','Sin línea cercana','No hay conexiones a menos de 200m.');return;}
-  var fromId=best.from,toId=best.to,net=best.net;
-  var fromName=S.elems[fromId]?S.elems[fromId].name:'?';
-  var toName=S.elems[toId]?S.elems[toId].name:'?';
-  S.conns=S.conns.filter(function(c){return c.id!==best.id;});
-  S.conns.push({id:uid(),from:fromId,to:id,net:net});
-  S.conns.push({id:uid(),from:id,to:toId,net:net});
-  el.on=true;
-  if(el.outlets){
-    var total=S.conns.filter(function(c){return c.from===id||c.to===id;}).length;
-    var needed=Math.max(total,el.salidas||2);
-    while(el.outlets.length<needed)el.outlets.push({open:true,name:'Salida '+(el.outlets.length+1)});
-    el.salidas=needed;
-    el.outlets.forEach(function(o){o.open=true;});
-  }
-  addHist('Config','Conectó "'+el.name+'" en '+fromName+' ↔ '+toName,'Red: '+net);
-  renderAll();renderCfg();save();
-  showToast('✅','Conectado','"'+el.name+'" en '+fromName+' ↔ '+toName+' ('+Math.round(bestDist)+'m)');
-}
-
 function distPtoSeg(plat,plng,alat,alng,blat,blng){
   var cos=Math.cos(plat*Math.PI/180);
   var R=111320; // metros por grado lat
@@ -1729,36 +1689,146 @@ function schZoom(f){schScale=Math.max(0.3,Math.min(3,schScale*f));if(schG)schG.s
 function schFit(){schScale=1;schTx=10;schTy=10;if(schG)schG.setAttribute('transform','translate(10,10) scale(1)');}
 
 function renderRed(){
-  const{energized,watered}=calcStates();
-  document.getElementById('sch-empty').style.display=S.conns.length?'none':'flex';
-  if(!S.conns.length){schG.innerHTML='';return;}
-  const nodes={};let idx=0;
-  Object.values(S.elems).forEach(el=>{
-    const hasConn=S.conns.some(c=>c.from===el.id||c.to===el.id);
-    if(!hasConn)return;
-    nodes[el.id]={el,x:60+(idx%8)*90,y:60+Math.floor(idx/8)*80};idx++;
+  var st=calcStates(),energized=st.energized,watered=st.watered;
+  var empty=document.getElementById('sch-empty');
+  if(!S.conns.length){if(empty)empty.style.display='flex';if(schG)schG.innerHTML='';return;}
+  if(empty)empty.style.display='none';
+  if(!schG)return;
+
+  var SIST_COL={1:'#4caf50',2:'#42a5f5',3:'#ffb300',4:'#ef9a9a'};
+  var SIST_NAME={1:'S1',2:'S2',3:'S3',4:'S4'};
+  var ORDER={bomba_solar:0,bomba:0,energizador:0,tanque:1,
+    distribuidor_t:2,distribuidor_x:2,llave_x:2,llave_t:2,
+    llave_agua:3,llave_elec:3,poste_t:3,poste_x:3,bebedero:4,potrero:4};
+
+  // 1. Nodos con conexiones
+  var nodeIds={};
+  Object.values(S.elems).forEach(function(el){
+    if(S.conns.some(function(c){return c.from===el.id||c.to===el.id;}))
+      nodeIds[el.id]=el;
   });
-  let html='';
-  S.conns.forEach(c=>{
-    const a=nodes[c.from],b=nodes[c.to];if(!a||!b)return;
-    const flowing=c.net==='agua'?watered.has(c.from)&&watered.has(c.to):energized.has(c.from)&&energized.has(c.to);
-    const col=c.net==='agua'?(flowing?'#29b6f6':'#b71c1c'):(flowing?'#ffd54f':'#5d4037');
-    const mark=c.net==='agua'?(flowing?'arr-agua':'arr-agua-off'):(flowing?'arr-elec':'arr-elec-off');
-    html+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="${flowing?2:1.5}" stroke-dasharray="${flowing?'none':'6 4'}" marker-end="url(#${mark})" opacity="${flowing?.9:.5}"/>`;
+
+  // 2. Union-Find: agrupar sistemas conectados
+  var allSist=[1,2,3,4];
+  var parent={1:1,2:2,3:3,4:4};
+  function findRoot(s){while(parent[s]!==s){parent[s]=parent[parent[s]];s=parent[s];}return s;}
+  S.conns.forEach(function(c){
+    var a=nodeIds[c.from],b=nodeIds[c.to];
+    if(!a||!b)return;
+    var sa=a.sistema||1,sb=b.sistema||1;
+    if(sa!==sb){var ra=findRoot(sa),rb=findRoot(sb);if(ra!==rb)parent[ra]=rb;}
   });
-  Object.values(nodes).forEach(({el,x,y})=>{
-    const ti=T[el.type]||{ico:'?'};
-    const hE=energized.has(el.id),hW=watered.has(el.id);
-    const active=ti.net==='agua'?hW:hE;
-    const col=active?'#4caf50':'#ef5350';
-    html+=`<g>
-      <circle cx="${x}" cy="${y}" r="20" fill="var(--surf2)" stroke="${col}" stroke-width="1.5"/>
-      <text x="${x}" y="${y+5}" text-anchor="middle" font-size="14">${ti.ico}</text>
-      <text x="${x}" y="${y+34}" text-anchor="middle" font-size="8" fill="var(--txt2)" font-family="var(--cond)">${el.name.substring(0,12)}</text>
-    </g>`;
+  var groups={};
+  Object.keys(nodeIds).forEach(function(id){
+    var s=nodeIds[id].sistema||1;
+    var r=findRoot(s);
+    if(!groups[r])groups[r]=new Set();
+    groups[r].add(s);
   });
+
+  // 3. Layout
+  var NODE_R=22,COL_W=110,ROW_H=90,PAD_Y=52,GAP=28,SIST_GAP=16;
+  var nodes={};
+  var curX=16;
+  var groupLayouts=[];
+
+  Object.values(groups).sort(function(a,b){return Math.min(...a)-Math.min(...b);}).forEach(function(sistSet){
+    var sistArr=Array.from(sistSet).sort(function(a,b){return a-b;});
+    var groupStartX=curX;
+    var groupMaxY=0;
+    var sistX=curX;
+
+    sistArr.forEach(function(s){
+      var elems=Object.values(nodeIds).filter(function(el){return (el.sistema||1)===s;});
+      elems.sort(function(a,b){return (ORDER[a.type]||5)-(ORDER[b.type]||5);});
+      var ROWS=Math.max(1,Math.min(5,Math.ceil(elems.length/Math.max(1,Math.ceil(elems.length/4)))));
+      var COLS=Math.max(1,Math.ceil(elems.length/ROWS));
+      elems.forEach(function(el,i){
+        var col=Math.floor(i/ROWS),row=i%ROWS;
+        nodes[el.id]={el:el,x:sistX+col*COL_W+COL_W/2,y:PAD_Y+row*ROW_H+NODE_R,s:s,group:findRoot(s)};
+      });
+      var sistH=ROWS*ROW_H+PAD_Y+20;
+      if(sistH>groupMaxY)groupMaxY=sistH;
+      sistX+=COLS*COL_W+SIST_GAP;
+    });
+
+    var groupW=sistX-groupStartX-SIST_GAP+GAP/2;
+    groupLayouts.push({systems:sistArr,x:groupStartX-GAP/4,w:groupW,h:groupMaxY});
+    curX=groupStartX+groupW+GAP;
+  });
+
+  var maxX=0,maxY=0;
+  Object.values(nodes).forEach(function(n){if(n.x>maxX)maxX=n.x;if(n.y>maxY)maxY=n.y;});
+  if(schSvg)schSvg.setAttribute('viewBox','0 0 '+(maxX+80)+' '+(maxY+NODE_R+50));
+
+  var html='';
+
+  // 4. Fondos
+  groupLayouts.forEach(function(g){
+    if(g.systems.length>1){
+      html+='<rect x="'+g.x+'" y="2" width="'+g.w+'" height="'+(g.h+6)+'" rx="10"'
+        +' fill="rgba(255,255,255,0.025)" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" stroke-dasharray="5 4"/>';
+      html+='<text x="'+(g.x+g.w/2)+'" y="13" text-anchor="middle" font-size="6.5"'
+        +' font-family="Barlow Condensed,sans-serif" font-weight="600"'
+        +' fill="rgba(255,255,255,0.3)" letter-spacing="1.5">SISTEMAS UNIDOS</text>';
+    }
+    g.systems.forEach(function(s){
+      var sNodes=Object.values(nodes).filter(function(n){return n.s===s;});
+      if(!sNodes.length)return;
+      var xs=sNodes.map(function(n){return n.x;}),ys=sNodes.map(function(n){return n.y;});
+      var minX=Math.min.apply(null,xs)-COL_W/2+6;
+      var maxXs=Math.max.apply(null,xs)+COL_W/2-6;
+      var bw=maxXs-minX;
+      var bh=Math.max.apply(null,ys)+NODE_R+18-(PAD_Y-12);
+      var sc=SIST_COL[s]||'#888';
+      html+='<rect x="'+minX+'" y="'+(PAD_Y-12)+'" width="'+bw+'" height="'+bh+'" rx="6"'
+        +' fill="'+sc+'" fill-opacity="0.07" stroke="'+sc+'" stroke-opacity="0.4" stroke-width="1"/>';
+      html+='<text x="'+(minX+bw/2)+'" y="'+(PAD_Y+1)+'" text-anchor="middle" font-size="8"'
+        +' font-family="Barlow Condensed,sans-serif" font-weight="700"'
+        +' fill="'+sc+'" letter-spacing="1.5" opacity="0.9">'+SIST_NAME[s]+'</text>';
+    });
+  });
+
+  // 5. Conexiones
+  S.conns.forEach(function(c){
+    var a=nodes[c.from],b=nodes[c.to];if(!a||!b)return;
+    var fl=c.net==='agua'?watered.has(c.from)&&watered.has(c.to):energized.has(c.from)&&energized.has(c.to);
+    var col=c.net==='agua'?(fl?'#29b6f6':'#b71c1c'):(fl?'#ffd54f':'#5d4037');
+    var mark=c.net==='agua'?(fl?'arr-agua':'arr-agua-off'):(fl?'arr-elec':'arr-elec-off');
+    if(a.s!==b.s){
+      var mx=(a.x+b.x)/2,my=Math.min(a.y,b.y)-38;
+      html+='<path d="M'+a.x+','+a.y+' Q'+mx+','+my+' '+b.x+','+b.y+'"'
+        +' stroke="'+col+'" stroke-width="'+(fl?3:2)+'" fill="none"'
+        +' stroke-dasharray="'+(fl?'none':'5 4')+'" marker-end="url(#'+mark+')" opacity="'+(fl?.85:.4)+'"/>';
+      html+='<text x="'+mx+'" y="'+(my-3)+'" text-anchor="middle" font-size="9" opacity="0.65">'+(c.net==='agua'?'💧':'⚡')+'</text>';
+    } else {
+      html+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'"'
+        +' stroke="'+col+'" stroke-width="'+(fl?2.5:1.5)+'" stroke-dasharray="'+(fl?'none':'6 4')+'"'
+        +' marker-end="url(#'+mark+')" opacity="'+(fl?.9:.45)+'"/>';
+    }
+  });
+
+  // 6. Nodos
+  Object.values(nodes).forEach(function(n){
+    var el=n.el,x=n.x,y=n.y;
+    var ti=T[el.type]||{ico:'?',net:'both'};
+    var sc=SIST_COL[el.sistema||1]||'#888';
+    var active=ti.net==='agua'?watered.has(el.id):(ti.net==='elec'?energized.has(el.id):(watered.has(el.id)||energized.has(el.id)));
+    var bc=active?'#4caf50':'#ef5350';
+    var bg=active?'rgba(76,175,80,0.15)':'rgba(239,83,80,0.08)';
+    var nm=el.name.length>11?el.name.substring(0,10)+'…':el.name;
+    html+='<g style="cursor:pointer" onclick="pickFromRed(''+el.id+'')"><title>'+el.name+' · S'+(el.sistema||1)+'</title>'
+      +'<circle cx="'+x+'" cy="'+y+'" r="'+NODE_R+'" fill="'+bg+'" stroke="'+bc+'" stroke-width="'+(active?2:1.2)+'"/>'
+      +'<circle cx="'+x+'" cy="'+y+'" r="'+NODE_R+'" fill="none" stroke="'+sc+'" stroke-width="2" stroke-dasharray="3 3" opacity="0.45"/>'
+      +'<circle cx="'+(x+NODE_R-4)+'" cy="'+(y-NODE_R+4)+'" r="4" fill="'+bc+'"/>'
+      +'<text x="'+x+'" y="'+(y+6)+'" text-anchor="middle" font-size="15" dominant-baseline="middle">'+ti.ico+'</text>'
+      +'<text x="'+x+'" y="'+(y+NODE_R+12)+'" text-anchor="middle" font-size="7.5" fill="#6a9b6e" font-family="Barlow Condensed,sans-serif" font-weight="600">'+nm+'</text>'
+      +'</g>';
+  });
+
   schG.innerHTML=html;
 }
+
 
 
 
