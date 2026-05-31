@@ -268,7 +268,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v47</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v48</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -1265,16 +1265,43 @@ function autoInsertInConn(newId, ll){
     if(d<bestDist){bestDist=d;best=c;}
   });
   if(!best) return;
+
   var fromId=best.from, toId=best.to, net=best.net;
   var fromName=S.elems[fromId]?S.elems[fromId].name:'?';
   var toName=S.elems[toId]?S.elems[toId].name:'?';
+
   // Eliminar conexión original
   S.conns=S.conns.filter(function(c){return c.id!==best.id;});
+
   // Crear dos conexiones: from→nuevo y nuevo→to
   S.conns.push({id:uid(),from:fromId,to:newId,net:net});
   S.conns.push({id:uid(),from:newId,to:toId,net:net});
+
+  // CRÍTICO: asegurar que el nuevo nodo está abierto (on=true)
+  el.on=true;
+
+  // CRÍTICO: si es JUNC, contar cuántas conexiones totales tiene ahora
+  // y asegurar que hay suficientes salidas ABIERTAS para todas
+  if(JUNC.includes(el.type)){
+    // Contar todas las conexiones del nodo (las recién creadas + las previas)
+    var connCount=S.conns.filter(function(c){return c.from===newId||c.to===newId;}).length;
+    var needed=Math.max(connCount, el.salidas||2);
+    // Expandir outlets si hacen falta
+    if(!el.outlets||el.outlets.length<needed){
+      var current=el.outlets||[];
+      var extra=needed-current.length;
+      for(var i=0;i<extra;i++){
+        current.push({open:true,name:'Salida '+(current.length+1)});
+      }
+      el.outlets=current;
+      el.salidas=needed;
+    }
+    // Asegurar que TODAS las salidas están abiertas
+    el.outlets.forEach(function(o){o.open=true;});
+  }
+
   addHist('Auto','Insertó "'+el.name+'" en línea '+fromName+' ↔ '+toName,'Red: '+net);
-  showToast('🔗','Insertado en red','"'+el.name+'" conectado en la línea '+fromName+' ↔ '+toName);
+  showToast('🔗','Insertado en red','"'+el.name+'" conectado en '+fromName+' ↔ '+toName);
 }
 
 function delFromModal(){
