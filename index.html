@@ -1474,8 +1474,13 @@ document.addEventListener('click',function(e){
 
 // ── JUNCTION VALVE ─────────────────────────────────────────
 function showJunc(id){
-  const el=S.elems[id];if(!el||!el.outlets)return;
+  const el=S.elems[id];if(!el)return;
   const ti=T[el.type]||{ico:'?'};
+  // Si no tiene salidas configuradas, operar como llave simple
+  if(!el.outlets||el.outlets.length===0){
+    askTog(id);
+    return;
+  }
   document.getElementById('mj-title').textContent=ti.ico+' '+el.name;
   renderJuncOutlets(id);
   document.getElementById('m-junc').classList.add('on');
@@ -1880,14 +1885,6 @@ function renderRed(){
   });
 
   schG.innerHTML=html;
-  // Event listener delegado para nodos del esquema
-  var groups=schG.querySelectorAll ? schG.querySelectorAll('.rn') : [];
-  for(var gi=0;gi<groups.length;gi++){
-    groups[gi].style.cursor='pointer';
-    (function(g){
-      g.addEventListener('click',function(){pickFromRed(g.getAttribute('data-id'));});
-    })(groups[gi]);
-  }
 }
 
 
@@ -1947,12 +1944,18 @@ initSchema();
 
 // Migración: outlets para junctions sin ellos
 (function migrate(){
-  let changed=false;
-  Object.values(S.elems).forEach(el=>{
+  var changed=false;
+  Object.values(S.elems).forEach(function(el){
     if(JUNC.includes(el.type)&&!el.outlets){
-      const n=el.salidas||2;
-      el.outlets=Array.from({length:n},(_,i)=>({open:true,name:'Salida '+(i+1)}));
-      changed=true;
+      // Si salidas está explícitamente declarado, usarlo
+      // Si no, dejar como paso directo (0 salidas) para que el usuario configure
+      var n=el.salidas; // NO usar fallback a 2
+      if(n && n>0){
+        el.outlets=[];
+        for(var i=0;i<n;i++) el.outlets.push({open:true,name:'Salida '+(i+1)});
+        changed=true;
+      }
+      // Si salidas es null/undefined/0: queda sin outlets (paso directo)
     }
   });
   if(changed){save();console.log('Migración outlets OK');}
