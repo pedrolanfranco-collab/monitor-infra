@@ -268,7 +268,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v52</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v53</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -908,11 +908,13 @@ function calcStates(){
         if(e.net!==net&&e.net!=='both')return;
         if(reached.has(e.to))return;
         const el=S.elems[e.to];if(!el)return;
-        if(T[el.type]?.valve&&!el.on)return;
+        // T/Cruz sin outlets = paso directo (nunca bloquea)
+        const isPassThrough=JUNC.includes(el.type)&&(!el.outlets||el.outlets.length===0);
+        if(!isPassThrough&&T[el.type]&&T[el.type].valve&&!el.on)return;
         const curEl=S.elems[cur];
-        if(curEl&&JUNC.includes(curEl.type)&&curEl.outlets&&outletMap[cur]){
+        if(curEl&&JUNC.includes(curEl.type)&&curEl.outlets&&curEl.outlets.length>0&&outletMap[cur]){
           const oi=outletMap[cur][e.to];
-          if(oi!==undefined&&!curEl.outlets[oi]?.open)return;
+          if(oi!==undefined&&curEl.outlets[oi]&&!curEl.outlets[oi].open)return;
         }
         reached.add(e.to);q.push(e.to);
       });
@@ -1463,8 +1465,7 @@ function pickElem(id){
   document.getElementById('m-pick').style.display='none';
   if(connMode){handleConn(id);return;}
   const el=S.elems[id];if(!el)return;
-  if(JUNC.includes(el.type)&&el.outlets)showJunc(id);
-  else if(T[el.type]?.valve)askTog(id);
+  if(JUNC.includes(el.type)){if(el.outlets&&el.outlets.length>0)showJunc(id);else showToast('⊤','Paso directo','Este elemento no tiene salidas configuradas. Editalo en Config para agregar salidas.');} else if(T[el.type]&&T[el.type].valve)askTog(id);
   else showEdit(id);
 }
 document.addEventListener('click',function(e){
@@ -1912,7 +1913,7 @@ window.addEventListener('DOMContentLoaded', function(){
     if(addMode){exitAll();showAdd(e.latlng);return;}
     if(moveMode&&moveId){var el=S.elems[moveId];if(el){el.geom={...el.geom,lat:e.latlng.lat,lng:e.latlng.lng};addHist('Config','Movió "'+el.name+'" a nueva posición');if(JUNC.includes(el.type))autoInsertInConn(moveId,e.latlng);}exitAll();renderAll();renderCfg();save();return;}
     var near=Object.values(S.elems).filter(function(el){if(!el.geom||el.geom.type==='Polygon')return false;return map.distance(e.latlng,L.latLng(el.geom.lat,el.geom.lng))<50;});
-    if(near.length===1){if(connMode){handleConn(near[0].id);return;}var el2=near[0];if(JUNC.includes(el2.type)&&el2.outlets)showJunc(el2.id);else if(T[el2.type]&&T[el2.type].valve)askTog(el2.id);}
+    if(near.length===1){if(connMode){handleConn(near[0].id);return;}var el2=near[0];if(JUNC.includes(el2.type)){if(el2.outlets&&el2.outlets.length>0)showJunc(el2.id);else showToast('⊤','Paso directo','Este elemento no tiene salidas configuradas. Opera como paso directo sin llave.');} else if(T[el2.type]&&T[el2.type].valve)askTog(el2.id);}
     else if(near.length>1){showPicker(near,e.containerPoint);}
   });
   map.on('dblclick',function(e){if(drawMode){finishDraw();e.originalEvent.preventDefault();}});
