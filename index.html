@@ -248,7 +248,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v43</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v44</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -689,16 +689,6 @@ var PIN_KEY='mhe_pin';
 var BACKUP_KEY='mhe_last_export';
 var pinCb=null;
 var connFilter='all';
-
-// ── MAP ────────────────────────────────────────────────────
-var osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
-var sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
-var map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
-map.setView([-31.4,-55.42],13);
-var baseL=L.layerGroup().addTo(map);
-var elemL=L.layerGroup().addTo(map);
-var satOn=false;
-function togLayer(){satOn=!satOn;satOn?map.addLayer(sat)&&map.removeLayer(osm):map.addLayer(osm)&&map.removeLayer(sat);document.getElementById('btn-sat').classList.toggle('active',satOn);}
 
 // ── CLOCK ──────────────────────────────────────────────────
 setInterval(()=>{
