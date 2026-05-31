@@ -1484,13 +1484,6 @@ async function importJSON(inp){
     if(d.hist)S.hist.push.apply(S.hist,d.hist);
     console.log('[Import] elems:',Object.keys(S.elems).length,'conns:',S.conns.length);
     save();
-    // Calcular centro ANTES de renderizar
-    var pts2=Object.values(S.elems).filter(function(e){return e.geom&&e.geom.lat;});
-    var centerLat=-31.4, centerLng=-55.42, zoomLvl=13;
-    if(pts2.length){
-      centerLat=pts2.reduce(function(s,e){return s+e.geom.lat;},0)/pts2.length;
-      centerLng=pts2.reduce(function(s,e){return s+e.geom.lng;},0)/pts2.length;
-    }
     renderAll();
     renderCfg();
     // Ir al tab MAPA
@@ -1498,22 +1491,25 @@ async function importJSON(inp){
     document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
     document.getElementById('pv-mapa').classList.add('on');
     document.querySelector('.tab').classList.add('active');
-    // Centrar mapa: primero setView inmediato, luego fitBounds con delay
-    map.setView([centerLat, centerLng], zoomLvl);
-    setTimeout(function(){
-      map.invalidateSize();
-      if(pts2.length){
+    // Centrar mapa con guards
+    var pts2=Object.values(S.elems).filter(function(e){return e.geom&&e.geom.lat;});
+    if(pts2.length && map && typeof map.setView==='function'){
+      var clat=pts2.reduce(function(s,e){return s+e.geom.lat;},0)/pts2.length;
+      var clng=pts2.reduce(function(s,e){return s+e.geom.lng;},0)/pts2.length;
+      map.setView([clat,clng],13);
+      setTimeout(function(){
+        if(map&&typeof map.invalidateSize==='function') map.invalidateSize();
         try{
-          var lats2=pts2.map(function(e){return e.geom.lat;});
-          var lngs2=pts2.map(function(e){return e.geom.lng;});
-          var b2=L.latLngBounds(
-            [Math.min.apply(null,lats2)-0.01, Math.min.apply(null,lngs2)-0.01],
-            [Math.max.apply(null,lats2)+0.01, Math.max.apply(null,lngs2)+0.01]
+          var lats=pts2.map(function(e){return e.geom.lat;});
+          var lngs=pts2.map(function(e){return e.geom.lng;});
+          var b=L.latLngBounds(
+            [Math.min.apply(null,lats)-0.01,Math.min.apply(null,lngs)-0.01],
+            [Math.max.apply(null,lats)+0.01,Math.max.apply(null,lngs)+0.01]
           );
-          if(b2.isValid())map.fitBounds(b2,{padding:[30,30]});
+          if(b.isValid())map.fitBounds(b,{padding:[30,30]});
         }catch(err){console.warn('[fitBounds]',err);}
-      }
-    },500);
+      },500);
+    }
     showToast('✅','Importación exitosa',Object.keys(S.elems).length+' elementos · '+S.conns.length+' conexiones cargadas.');
   }catch(e){
     showToast('❌','Error de importación',e.message||'Archivo no reconocido');
