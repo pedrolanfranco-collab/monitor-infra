@@ -144,14 +144,18 @@ body{display:flex;flex-direction:column}
 .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 
 /* ELEMENT PICKER */
-#m-pick{display:none;position:absolute;z-index:800;background:var(--surf);border:1px solid var(--brd2);border-radius:8px;min-width:180px;max-width:220px;box-shadow:0 8px 30px rgba(0,0,0,.6);overflow:hidden}
-.pick-item{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;font-size:12px;transition:background .12s;border-bottom:1px solid var(--brd)}
+#m-pick{display:none;position:absolute;z-index:800;background:var(--surf);border:1px solid var(--brd2);border-radius:10px;min-width:200px;max-width:260px;box-shadow:0 12px 40px rgba(0,0,0,.7);overflow:hidden}
+#m-pick-header{background:var(--surf2);border-bottom:2px solid var(--brd2);padding:8px 12px;font-family:var(--cond);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--txt2);display:flex;align-items:center;justify-content:space-between}
+#m-pick-header span{color:var(--green2)}
+.pick-item{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;font-size:12px;transition:background .12s;border-bottom:1px solid var(--brd);position:relative}
 .pick-item:last-child{border-bottom:none}
 .pick-item:hover{background:var(--surf2)}
-.pick-ico{font-size:15px;width:18px;text-align:center}
+.pick-item:hover::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--green)}
+.pick-ico{font-size:18px;width:22px;text-align:center;flex-shrink:0}
 .pick-info{flex:1;min-width:0}
-.pick-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pick-sub{font-family:var(--mono);font-size:9px;color:var(--txt2)}
+.pick-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+.pick-sub{font-family:var(--mono);font-size:9px;color:var(--txt2);margin-top:1px}
+.pick-state{font-family:var(--mono);font-size:9px;padding:2px 5px;border-radius:3px;flex-shrink:0;font-weight:700}
 
 /* OUTLET VALVE */
 .outlet-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--brd)}
@@ -1257,16 +1261,40 @@ map.on('dblclick',function(e){if(drawMode){finishDraw();e.originalEvent.preventD
 // ── ELEMENT PICKER (múltiples solapados) ───────────────────
 function showPicker(elems,px){
   const pop=document.getElementById('m-pick');
-  pop.innerHTML=elems.map(e=>{
+  const{energized,watered}=calcStates();
+  // Header
+  let html=`<div id="m-pick-header"><span>📍 SELECCIONAR</span><span>${elems.length} elementos</span></div>`;
+  // Items con estado
+  html+=elems.map(e=>{
     const ti=T[e.type]||{ico:'?',lbl:e.type};
+    let stateHtml='';
+    if(T[e.type]?.valve){
+      const on=e.on;
+      stateHtml=`<span class="pick-state" style="background:${on?'rgba(76,175,80,.2)':'rgba(239,83,80,.15)'};color:${on?'var(--green2)':'var(--red)'}">${on?'ABT':'CRR'}</span>`;
+    } else if(e.type==='potrero'){
+      const hE=energized.has(e.id),hW=watered.has(e.id);
+      const ok=hE&&hW;
+      stateHtml=`<span class="pick-state" style="background:${ok?'rgba(76,175,80,.2)':'rgba(239,83,80,.15)'};color:${ok?'var(--green2)':'var(--red)'}">${hE?'⚡':'—'} ${hW?'💧':'—'}</span>`;
+    } else if(e.type==='bebedero'){
+      const hW=watered.has(e.id);
+      stateHtml=`<span class="pick-state" style="background:${hW?'rgba(66,165,245,.2)':'rgba(239,83,80,.15)'};color:${hW?'var(--blue)':'var(--red)'}">${hW?'💧':'—'}</span>`;
+    }
     return `<div class="pick-item" onclick="pickElem('${e.id}')">
       <span class="pick-ico">${ti.ico}</span>
-      <div class="pick-info"><div class="pick-name">${e.name}</div><div class="pick-sub">${ti.lbl}${e.sistema?' · S'+e.sistema:''}</div></div>
+      <div class="pick-info">
+        <div class="pick-name">${e.name}</div>
+        <div class="pick-sub">${ti.lbl}${e.sistema?' · S'+e.sistema:''}</div>
+      </div>
+      ${stateHtml}
     </div>`;
   }).join('');
+  pop.innerHTML=html;
+  // Posicionamiento adaptativo (mobile y desktop)
   const W=window.innerWidth,H=window.innerHeight;
-  let x=px.x+10,y=px.y+10;
-  if(x+200>W)x=px.x-210;if(y+280>H)y=Math.max(10,H-290);
+  const popW=260,popH=Math.min(elems.length*52+36,320);
+  let x=px.x+12,y=px.y+12;
+  if(x+popW>W-10)x=Math.max(10,px.x-popW-8);
+  if(y+popH>H-10)y=Math.max(10,H-popH-10);
   pop.style.left=x+'px';pop.style.top=y+'px';pop.style.display='block';
 }
 function pickElem(id){
@@ -1275,6 +1303,7 @@ function pickElem(id){
   const el=S.elems[id];if(!el)return;
   if(JUNC.includes(el.type)&&el.outlets)showJunc(id);
   else if(T[el.type]?.valve)askTog(id);
+  else showEdit(id);
 }
 document.addEventListener('click',function(e){
   const pop=document.getElementById('m-pick');
@@ -1601,7 +1630,7 @@ window.addEventListener('DOMContentLoaded', function(){
     }
     if(addMode){exitAll();showAdd(e.latlng);return;}
     if(moveMode&&moveId){var el=S.elems[moveId];if(el){el.geom={...el.geom,lat:e.latlng.lat,lng:e.latlng.lng};addHist('Config','Movió "'+el.name+'" a nueva posición');}exitAll();renderAll();renderCfg();save();return;}
-    var near=Object.values(S.elems).filter(function(el){if(!el.geom||el.geom.type==='Polygon')return false;return map.distance(e.latlng,L.latLng(el.geom.lat,el.geom.lng))<30;});
+    var near=Object.values(S.elems).filter(function(el){if(!el.geom||el.geom.type==='Polygon')return false;return map.distance(e.latlng,L.latLng(el.geom.lat,el.geom.lng))<50;});
     if(near.length===1){if(connMode){handleConn(near[0].id);return;}var el2=near[0];if(JUNC.includes(el2.type)&&el2.outlets)showJunc(el2.id);else if(T[el2.type]&&T[el2.type].valve)askTog(el2.id);}
     else if(near.length>1){showPicker(near,e.containerPoint);}
   });
