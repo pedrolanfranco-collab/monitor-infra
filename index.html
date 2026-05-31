@@ -494,8 +494,16 @@ body{display:flex;flex-direction:column}
         <option value="3">Sistema 3</option><option value="4">Sistema 4</option>
       </select>
     </div>
-    <div id="me-sal-row" style="display:none"><label>Salidas</label>
-      <select id="me-sal"><option value="2">2 salidas</option><option value="3">3 salidas</option><option value="4">4 salidas</option></select>
+    <div id="me-sal-row" style="display:none">
+      <label>Salidas (0 = sin salidas individuales)</label>
+      <select id="me-sal" onchange="updateSalPreview()">
+        <option value="0">0 — sin salidas (paso directo)</option>
+        <option value="1">1 salida</option>
+        <option value="2">2 salidas</option>
+        <option value="3">3 salidas</option>
+        <option value="4">4 salidas</option>
+      </select>
+      <div id="me-sal-preview" style="margin-top:6px;font-size:10px;color:var(--txt2);font-family:var(--mono)"></div>
     </div>
     <label>Estado</label>
     <select id="me-on"><option value="1">Activo / Abierta</option><option value="0">Inactivo / Cerrada</option></select>
@@ -1163,10 +1171,31 @@ function renderCfg(){
 
 // ── ELEMENT CRUD ───────────────────────────────────────────
 function onType(){
-  const t=document.getElementById('me-type').value;
+  var t=document.getElementById('me-type').value;
   document.getElementById('me-sist-row').style.display=SIST_T.includes(t)?'block':'none';
   document.getElementById('me-sal-row').style.display=JUNC.includes(t)?'block':'none';
-  if(JUNC.includes(t))document.getElementById('me-sal').value=t.endsWith('_t')?'2':'3';
+  if(JUNC.includes(t)){
+    var cur=parseInt(document.getElementById('me-sal').value);
+    // Solo cambiar el default si no hay valor o si viene de otro tipo
+    if(isNaN(cur)||cur<0)document.getElementById('me-sal').value=t.endsWith('_t')?'2':'3';
+  }
+  updateSalPreview();
+}
+
+function updateSalPreview(){
+  var id=document.getElementById('me-id').value;
+  var n=parseInt(document.getElementById('me-sal').value)||0;
+  var preview=document.getElementById('me-sal-preview');
+  if(!preview)return;
+  var ex=S.elems[id];
+  if(!n){preview.textContent='El elemento actúa como paso directo sin salidas individuales.';return;}
+  var lines=[];
+  for(var i=0;i<n;i++){
+    var nombre=(ex&&ex.outlets&&ex.outlets[i])?ex.outlets[i].name:'Salida '+(i+1);
+    var estado=(ex&&ex.outlets&&ex.outlets[i])?(ex.outlets[i].open?'✅ ABIERTA':'❌ CERRADA'):'✅ ABIERTA';
+    lines.push((i+1)+'. '+nombre+' — '+estado);
+  }
+  preview.innerHTML=lines.join('<br>');
 }
 
 function showAdd(ll){
@@ -1180,12 +1209,19 @@ function showAdd(ll){
 function showEdit(id){
   const el=S.elems[id];
   document.getElementById('me-title').textContent='EDITAR ELEMENTO';
-  document.getElementById('me-id').value=id;document.getElementById('me-name').value=el.name;
-  document.getElementById('me-type').value=el.type;document.getElementById('me-sist').value=el.sistema||1;
+  document.getElementById('me-id').value=id;
+  document.getElementById('me-name').value=el.name;
+  document.getElementById('me-type').value=el.type;
+  document.getElementById('me-sist').value=el.sistema||1;
   document.getElementById('me-on').value=el.on?'1':'0';
-  if(el.salidas)document.getElementById('me-sal').value=el.salidas;
+  // Cargar cantidad de salidas actual (puede ser 0,1,2,3,4)
+  if(JUNC.includes(el.type)){
+    var nSal=el.outlets?el.outlets.length:(el.salidas||2);
+    document.getElementById('me-sal').value=String(nSal);
+  }
   document.getElementById('me-del').style.display='block';
-  document._ll=null;pendingGeom=null;onType();document.getElementById('m-elem').classList.add('on');
+  document._ll=null;pendingGeom=null;onType();updateSalPreview();
+  document.getElementById('m-elem').classList.add('on');
 }
 
 function saveElem(){
@@ -1200,8 +1236,25 @@ function saveElem(){
   const dg=pendingGeom?pendingGeom:ll?{type:'Point',lat:ll.lat,lng:ll.lng}:{type:'Point',lat:map.getCenter().lat,lng:map.getCenter().lng};
   let outlets=ex?.outlets||null;
   if(JUNC.includes(type)){
-    const n=salidas||2;
-    if(!outlets||outlets.length!==n)outlets=Array.from({length:n},(_,i)=>({open:true,name:'Salida '+(i+1)}));
+    const n=salidas||0;
+    if(n===0){
+      // Sin salidas individuales — paso directo
+      outlets=null;
+    } else {
+      // Preservar salidas existentes, agregar o quitar según n
+      var prev=ex?.outlets||[];
+      var newOutlets=[];
+      for(var i=0;i<n;i++){
+        if(prev[i]){
+          // Preservar nombre y estado existente
+          newOutlets.push({open:prev[i].open,name:prev[i].name});
+        } else {
+          // Nueva salida
+          newOutlets.push({open:true,name:'Salida '+(i+1)});
+        }
+      }
+      outlets=newOutlets;
+    }
   }
   const isNew=!ex;
   S.elems[id]={id,type,name,sistema:sist,on,salidas,outlets,geom:ex?.geom||dg,fromKMZ:ex?.fromKMZ||false};
@@ -1817,7 +1870,7 @@ function renderRed(){
     var bc=active?'#4caf50':'#ef5350';
     var bg=active?'rgba(76,175,80,0.15)':'rgba(239,83,80,0.08)';
     var nm=el.name.length>11?el.name.substring(0,10)+'…':el.name;
-    html+='<g style="cursor:pointer" onclick="pickFromRed(&quot;'+el.id+'&quot;)"><title>'+el.name+' · S'+(el.sistema||1)+'</title>'
+    html+='<g style="cursor:pointer" onclick="pickFromRed(''+el.id+'')"><title>'+el.name+' · S'+(el.sistema||1)+'</title>'
       +'<circle cx="'+x+'" cy="'+y+'" r="'+NODE_R+'" fill="'+bg+'" stroke="'+bc+'" stroke-width="'+(active?2:1.2)+'"/>'
       +'<circle cx="'+x+'" cy="'+y+'" r="'+NODE_R+'" fill="none" stroke="'+sc+'" stroke-width="2" stroke-dasharray="3 3" opacity="0.45"/>'
       +'<circle cx="'+(x+NODE_R-4)+'" cy="'+(y-NODE_R+4)+'" r="4" fill="'+bc+'"/>'
