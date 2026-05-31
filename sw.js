@@ -2,7 +2,7 @@
 // La versión se lee del index.html automáticamente al instalar.
 // Si no puede leerla, usa el timestamp del momento de instalación.
 
-const FALLBACK_CACHE = 'mhe-v51';
+const FALLBACK_CACHE = 'mhe-v52';
 
 const STATIC = [
   './index.html',
