@@ -54,34 +54,41 @@ body{display:flex;flex-direction:column}
 /* PANEL VIEWS */
 .pv{display:none;flex-direction:column;height:100%;overflow:hidden}
 .pv.on{display:flex}
-.ph{font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:1px;color:var(--txt2);padding:8px 12px;border-bottom:1px solid var(--brd);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:var(--surf)}
+.ph{font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--green2);padding:10px 14px;border-bottom:2px solid var(--brd2);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:var(--surf2);text-transform:uppercase}
 .scroll{flex:1;overflow-y:auto;padding:6px}
 .half{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px;overflow-y:auto}
-.slbl{font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--txt3);padding:8px 12px 4px;text-transform:uppercase}
+.slbl{font-family:var(--mono);font-size:9px;letter-spacing:1.5px;color:var(--txt3);padding:10px 12px 5px;text-transform:uppercase;display:flex;align-items:center;gap:8px;flex-shrink:0;background:var(--bg2);border-top:2px solid var(--brd2);border-bottom:1px solid var(--brd);margin-top:4px}
+.slbl::before{content:'';flex:1;height:1px;background:var(--brd)}
+.slbl::after{content:'';flex:1;height:1px;background:var(--brd)}
 
 /* STATUS GRID */
-.sg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px;flex-shrink:0}
-.sc{background:var(--surf);border:1px solid var(--brd);border-radius:6px;padding:8px;text-align:center}
-.sv{font-family:var(--mono);font-size:20px;font-weight:700}
-.sl{font-family:var(--cond);font-size:9px;color:var(--txt2);letter-spacing:.5px;margin-top:2px}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;flex-shrink:0;background:var(--surf);border-bottom:2px solid var(--brd2)}
+.sc{background:var(--bg2);border:1px solid var(--brd2);border-radius:6px;padding:10px 8px;text-align:center;position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sc:nth-child(1)::before{background:var(--green)}
+.sc:nth-child(2)::before{background:var(--red)}
+.sc:nth-child(3)::before{background:var(--blue)}
+.sc:nth-child(4)::before{background:var(--amber)}
+.sv{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1}
+.sl{font-family:var(--cond);font-size:9px;color:var(--txt2);letter-spacing:.8px;margin-top:4px}
 
 /* ELEMENT ITEMS */
-.ei{display:flex;align-items:center;gap:8px;padding:7px 8px;background:var(--surf);border:1px solid var(--brd);border-radius:6px;margin-bottom:4px;cursor:pointer;transition:border-color .15s}
-.ei:hover{border-color:var(--brd2)}
+.ei{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surf);border:1px solid var(--brd);border-radius:6px;margin-bottom:4px;cursor:pointer;transition:all .15s;border-left:3px solid var(--brd2)}
+.ei:hover{border-color:var(--brd2);background:var(--surf2);border-left-color:var(--green)}
 .ei-ico{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .ei-info{flex:1;min-width:0}
 .ei-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ei-sub{font-family:var(--mono);font-size:9px;color:var(--txt2);margin-top:1px}
-.vbtn{padding:4px 8px;border-radius:4px;border:none;font-family:var(--cond);font-size:10px;font-weight:700;cursor:pointer;flex-shrink:0}
-.vo{background:rgba(66,165,245,.15);color:var(--blue);border:1px solid rgba(66,165,245,.3)}
-.vc{background:rgba(239,83,80,.15);color:var(--red);border:1px solid rgba(239,83,80,.3)}
+.vbtn{padding:5px 10px;border-radius:4px;border:none;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;letter-spacing:.3px}
+.vo{background:rgba(66,165,245,.2);color:var(--blue);border:1px solid rgba(66,165,245,.4)}
+.vc{background:rgba(239,83,80,.2);color:var(--red);border:1px solid rgba(239,83,80,.4)}
 
 /* INFRA CARDS */
-.ic{background:var(--surf);border:1px solid var(--brd);border-radius:6px;padding:7px;cursor:pointer;transition:border-color .15s}
-.ic:hover{border-color:var(--brd2)}
-.ic-ico{font-size:18px;text-align:center;margin-bottom:4px}
+.ic{background:var(--surf);border:1px solid var(--brd);border-radius:6px;padding:8px;cursor:pointer;transition:all .15s;border-top:2px solid var(--brd2)}
+.ic:hover{border-color:var(--brd2);background:var(--surf2);border-top-color:var(--green)}
+.ic-ico{font-size:20px;text-align:center;margin-bottom:4px}
 .ic-name{font-size:10px;font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ic-state{font-family:var(--mono);font-size:9px;text-align:center;margin-top:2px}
+.ic-state{font-family:var(--mono);font-size:9px;text-align:center;margin-top:3px;padding:2px 4px;border-radius:3px;display:inline-block;width:100%}
 
 /* POTRERO CARDS */
 .pc{background:var(--surf);border:1px solid var(--brd);border-radius:6px;padding:8px;margin-bottom:4px;border-left:3px solid}
@@ -986,7 +993,7 @@ function renderInfra(){
     return `<div class="ic" onclick="showEdit('${e.id}')">
       <div class="ic-ico">${ti.ico}</div>
       <div class="ic-name">${e.name}</div>
-      <div class="ic-state" style="color:${active?'var(--green2)':'var(--txt3)'}">${active?'● ACTIVO':'● INACTIVO'}</div>
+      <div class="ic-state" style="color:${active?'var(--green2)':'var(--txt3)'};background:${active?'rgba(76,175,80,.12)':'rgba(255,255,255,.04)'}">${active?'● ACTIVO':'○ INACT.'}</div>
     </div>`;
   }).join('');
 }
