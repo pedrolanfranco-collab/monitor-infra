@@ -61,6 +61,21 @@ body{display:flex;flex-direction:column}
 .slbl::before{content:'';flex:1;height:1px;background:var(--brd)}
 .slbl::after{content:'';flex:1;height:1px;background:var(--brd)}
 
+/* SECCIONES COLAPSABLES */
+.sec{flex-shrink:0;border-bottom:2px solid var(--brd2)}
+.sec-hdr{display:flex;align-items:center;gap:8px;padding:9px 12px 9px 14px;cursor:pointer;background:var(--surf);transition:background .15s;user-select:none;position:relative}
+.sec-hdr:hover{background:var(--surf2)}
+.sec-hdr::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:0 2px 2px 0}
+.sec-estado .sec-hdr::before{background:var(--green2)}
+.sec-llaves .sec-hdr::before{background:var(--blue)}
+.sec-infra .sec-hdr::before{background:var(--txt2)}
+.sec-title{font-family:var(--cond);font-size:11px;font-weight:700;letter-spacing:1px;color:var(--txt);flex:1;text-transform:uppercase}
+.sec-badge{font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:10px;background:var(--bg2);border:1px solid var(--brd2);color:var(--txt2);flex-shrink:0}
+.sec-arrow{font-size:10px;color:var(--txt3);transition:transform .2s;flex-shrink:0;line-height:1}
+.sec.collapsed .sec-arrow{transform:rotate(-90deg)}
+.sec-body{overflow:hidden;transition:max-height .3s ease;max-height:800px}
+.sec.collapsed .sec-body{max-height:0}
+
 /* STATUS GRID */
 .sg{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;flex-shrink:0;background:var(--surf);border-bottom:2px solid var(--brd2)}
 .sc{background:var(--bg2);border:1px solid var(--brd2);border-radius:6px;padding:10px 8px;text-align:center;position:relative;overflow:hidden}
@@ -233,7 +248,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v41</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v42</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -281,16 +296,53 @@ body{display:flex;flex-direction:column}
     <!-- MAPA -->
     <div class="pv on" id="pv-mapa">
       <div class="ph">ESTADO GENERAL</div>
-      <div class="sg">
-        <div class="sc"><div class="sv" id="s-eo" style="color:var(--green2)">—</div><div class="sl">⚡ ENERGIZADO</div></div>
-        <div class="sc"><div class="sv" id="s-en" style="color:var(--red)">—</div><div class="sl">⚡ SIN ENERGÍA</div></div>
-        <div class="sc"><div class="sv" id="s-ao" style="color:var(--blue)">—</div><div class="sl">💧 CON AGUA</div></div>
-        <div class="sc"><div class="sv" id="s-an" style="color:var(--amber)">—</div><div class="sl">💧 SIN AGUA</div></div>
+      <div style="overflow-y:auto;flex:1">
+
+        <!-- SECCIÓN: Resumen numérico -->
+        <div class="sec sec-estado" id="sec-estado">
+          <div class="sec-hdr" onclick="toggleSec('sec-estado')">
+            <span style="font-size:13px">📊</span>
+            <span class="sec-title">Resumen</span>
+            <span class="sec-badge" id="badge-estado">—</span>
+            <span class="sec-arrow">▼</span>
+          </div>
+          <div class="sec-body">
+            <div class="sg" style="border-bottom:none;padding:8px">
+              <div class="sc"><div class="sv" id="s-eo" style="color:var(--green2)">—</div><div class="sl">⚡ ENERGIZADO</div></div>
+              <div class="sc"><div class="sv" id="s-en" style="color:var(--red)">—</div><div class="sl">⚡ SIN ENERGÍA</div></div>
+              <div class="sc"><div class="sv" id="s-ao" style="color:var(--blue)">—</div><div class="sl">💧 CON AGUA</div></div>
+              <div class="sc"><div class="sv" id="s-an" style="color:var(--amber)">—</div><div class="sl">💧 SIN AGUA</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN: Llaves operables -->
+        <div class="sec sec-llaves" id="sec-llaves">
+          <div class="sec-hdr" onclick="toggleSec('sec-llaves')">
+            <span style="font-size:13px">🔌</span>
+            <span class="sec-title">Llaves operables</span>
+            <span class="sec-badge" id="badge-llaves">—</span>
+            <span class="sec-arrow">▼</span>
+          </div>
+          <div class="sec-body">
+            <div style="padding:6px" id="llave-list"><div class="es"><div class="bi">🔌</div>Sin llaves.<br>Importá un KMZ en Config.</div></div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN: Infraestructura -->
+        <div class="sec sec-infra" id="sec-infra">
+          <div class="sec-hdr" onclick="toggleSec('sec-infra')">
+            <span style="font-size:13px">💧</span>
+            <span class="sec-title">Infraestructura</span>
+            <span class="sec-badge" id="badge-infra">—</span>
+            <span class="sec-arrow">▼</span>
+          </div>
+          <div class="sec-body">
+            <div class="half" id="infra-list"><div class="es" style="padding:10px"><div class="bi" style="font-size:16px">💧</div>Sin elementos.</div></div>
+          </div>
+        </div>
+
       </div>
-      <div class="slbl">LLAVES OPERABLES</div>
-      <div class="scroll" id="llave-list"><div class="es"><div class="bi">🔌</div>Sin llaves.<br>Importá un KMZ en Config.</div></div>
-      <div class="slbl">INFRAESTRUCTURA</div>
-      <div class="half" id="infra-list"><div class="es" style="padding:10px"><div class="bi" style="font-size:16px">💧</div>Sin elementos.</div></div>
     </div>
 
     <!-- POTREROS -->
@@ -773,6 +825,11 @@ function confirmNewPIN(){
 }
 
 // ── MODAL HELPER ───────────────────────────────────────────
+function toggleSec(id){
+  var sec=document.getElementById(id);
+  if(sec)sec.classList.toggle('collapsed');
+}
+
 function closeM(id){document.getElementById(id).classList.remove('on');}
 
 // ── TABS ───────────────────────────────────────────────────
@@ -1010,6 +1067,15 @@ function renderStats(en,wa){
   document.getElementById('s-en').textContent=pts.length-eo;
   document.getElementById('s-ao').textContent=wo;
   document.getElementById('s-an').textContent=pts.length-wo;
+  // Badges de secciones
+  var b=document.getElementById('badge-estado');
+  if(b)b.textContent=pts.length?`${eo}/${pts.length} ⚡  ${wo}/${pts.length} 💧`:'—';
+  var ll=Object.values(S.elems).filter(e=>T[e.type]&&T[e.type].valve);
+  var bl=document.getElementById('badge-llaves');
+  if(bl)bl.textContent=ll.length?ll.length+' llaves':'—';
+  var ni=Object.values(S.elems).filter(e=>!T[e.type]?.valve&&e.type!=='potrero');
+  var bi=document.getElementById('badge-infra');
+  if(bi)bi.textContent=ni.length?ni.length+' elem':'—';
 }
 
 function updateHdr(en,wa){
@@ -1490,11 +1556,13 @@ function skipFeat(){featIdx=parseInt(document.getElementById('mf-idx').value)+1;
 function exportJSON(){
   const blob=new Blob([JSON.stringify({elems:S.elems,conns:S.conns,hist:S.hist},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`monitor_infra_${new Date().toISOString().slice(0,10)}.json`;a.click();
-  // Registrar timestamp del backup
+  const now=new Date();
+  const fecha=now.toISOString().slice(0,10);
+  const hora=now.toTimeString().slice(0,8).replace(/:/g,'-');
+  a.download=`monitor_infra_${fecha}_${hora}.json`;a.click();
   localStorage.setItem(BACKUP_KEY,Date.now().toString());
   checkBackupWarn();
-  showToast('✅','Backup exportado','Archivo JSON guardado correctamente.');
+  showToast('✅','Backup exportado',`Archivo guardado: monitor_infra_${fecha}_${hora}.json`);
 }
 
 async function importJSON(inp){
