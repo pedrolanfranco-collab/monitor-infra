@@ -867,21 +867,31 @@ function setBanner(msg,bg){
   bg=bg||'#1a2a0a';
   var b=document.getElementById('banner');
   if(!msg){b.style.display='none';b.innerHTML='';return;}
-  b.style.display='flex';b.style.background=bg;
-  b.style.alignItems='center';b.style.justifyContent='space-between';
-  b.style.color=bg.includes('6b')||bg.includes('1a6')?'#c8e6c9':'#fff';
+  b.style.cssText='display:flex;align-items:center;justify-content:space-between;background:'+bg+';color:'+((bg.indexOf('6b')>=0||bg.indexOf('1a6')>=0)?'#c8e6c9':'#fff')+';padding:8px 14px;';
   var showExit=connMode||addMode||moveMode||drawMode;
-  b.innerHTML='<span style="flex:1">'+msg+'</span>'
-    +(showExit?'<button onclick="exitAll();setBanner(\'\');" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:2px 10px;font-size:12px;cursor:pointer;font-family:var(--cond);font-weight:700;margin-left:8px;flex-shrink:0">✕ SALIR</button>':'');
+  var exitBtn='';
+  if(showExit)exitBtn='<button onclick="exitAll();setBanner(null);" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:2px 10px;font-size:12px;cursor:pointer;margin-left:8px;font-weight:700">X SALIR</button>';
+  b.innerHTML='<span>'+msg+'</span>'+exitBtn;
 }
 
-// ── EXIT ALL MODES ─────────────────────────────────────────
 function exitAll(){
   connMode=false;connFirst=null;
   addMode=false;
   moveMode=false;moveId=null;
   if(drawMode)cancelDraw();
   setBanner(null);
+}
+
+// Punto dentro de polígono (Ray casting)
+function ptInPoly(lat,lng,coords){
+  var inside=false;
+  for(var i=0,j=coords.length-1;i<coords.length;j=i++){
+    var yi=coords[i][0],xi=coords[i][1];
+    var yj=coords[j][0],xj=coords[j][1];
+    var intersect=((yi>lat)!==(yj>lat))&&(lng<(xj-xi)*(lat-yi)/(yj-yi)+xi);
+    if(intersect)inside=!inside;
+  }
+  return inside;
 }
 
 // ── GRAPH ──────────────────────────────────────────────────
@@ -905,27 +915,38 @@ function calcStates(){
     }
   });
   function bfs(srcs,net){
-    const reached=new Set(srcs);const q=[...srcs];
+    var reached=new Set(srcs);var q=srcs.slice();
     while(q.length){
-      const cur=q.shift();
-      (adj[cur]||[]).forEach(e=>{
+      var cur=q.shift();
+      (adj[cur]||[]).forEach(function(e){
         if(e.net!==net&&e.net!=='both')return;
         if(reached.has(e.to))return;
-        const el=S.elems[e.to];if(!el)return;
-        if(T[el.type]?.valve&&!el.on)return;
-        const curEl=S.elems[cur];
-        if(curEl&&JUNC.includes(curEl.type)&&curEl.outlets&&outletMap[cur]){
-          const oi=outletMap[cur][e.to];
-          if(oi!==undefined&&!curEl.outlets[oi]?.open)return;
+        var el=S.elems[e.to];if(!el)return;
+        var isPassThrough=JUNC.includes(el.type)&&(!el.outlets||el.outlets.length===0);
+        if(!isPassThrough&&T[el.type]&&T[el.type].valve&&!el.on)return;
+        var curEl=S.elems[cur];
+        if(curEl&&JUNC.includes(curEl.type)&&curEl.outlets&&curEl.outlets.length>0&&outletMap[cur]){
+          var oi=outletMap[cur][e.to];
+          if(oi!==undefined&&curEl.outlets[oi]&&!curEl.outlets[oi].open)return;
         }
         reached.add(e.to);q.push(e.to);
       });
     }
     return reached;
   }
-  const eS=Object.values(S.elems).filter(e=>e.type==='energizador'&&e.on).map(e=>e.id);
-  const wS=Object.values(S.elems).filter(e=>e.type==='tanque'&&e.on).map(e=>e.id);
-  return{energized:bfs(eS,'elec'),watered:bfs(wS,'agua')};
+  var eS=Object.values(S.elems).filter(function(e){return e.type==='energizador'&&e.on;}).map(function(e){return e.id;});
+  var wS=Object.values(S.elems).filter(function(e){return e.type==='tanque'&&e.on;}).map(function(e){return e.id;});
+  var energized=bfs(eS,'elec');
+  var watered=bfs(wS,'agua');
+  // Potrero con agua si tiene bebedero con agua dentro del polígono
+  Object.values(S.elems).forEach(function(pot){
+    if(pot.type!=='potrero'||!pot.geom||pot.geom.type!=='Polygon'||watered.has(pot.id))return;
+    Object.values(S.elems).forEach(function(b){
+      if(b.type!=='bebedero'||!b.geom||b.geom.type==='Polygon'||!watered.has(b.id))return;
+      if(ptInPoly(b.geom.lat,b.geom.lng,pot.geom.coords))watered.add(pot.id);
+    });
+  });
+  return{energized:energized,watered:watered};
 }
 
 function simTog(id){
@@ -1375,18 +1396,11 @@ function askResetAll(){
 // ── MODES ──────────────────────────────────────────────────
 function startAddMode(){exitAll();addMode=true;setBanner('📍 Tocá el mapa donde agregar el elemento','#1a6b2a');goTab('mapa',document.querySelector('.tab'));}
 function startMove(id){exitAll();moveMode=true;moveId=id;setBanner(`📍 Tocá la nueva ubicación de "${S.elems[id]?.name}"`, '#1a3a6b');goTab('mapa',document.querySelector('.tab'));}
-function startConn(){exitAll();connMode=true;connFirst=null;setBanner('🔗 Modo conexión — tocá el primer elemento · Doble toque en mapa vacío para salir');goTab('mapa',document.querySelector('.tab'));}
-
-// Escape para salir de cualquier modo activo
-document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'&&(connMode||addMode||moveMode||drawMode)){
-    exitAll();setBanner('');
-  }
-});
+function startConn(){exitAll();connMode=true;connFirst=null;setBanner('Modo conexión — tocá el primer elemento');goTab('mapa',document.querySelector('.tab'));}
 
 function handleConn(id){
   if(!connFirst){connFirst=id;setBanner(`"${S.elems[id].name}" → tocá el segundo elemento`);return;}
-  if(connFirst===id){connFirst=null;setBanner('🔗 Modo conexión — tocá el primer elemento');return;}
+  if(connFirst===id){connFirst=null;setBanner('Tocá el primer elemento');return;}
   const a=S.elems[connFirst],b=S.elems[id];
   const wt=['tanque','llave_agua','bebedero','bomba_solar','llave_t','llave_x','distribuidor_t','distribuidor_x'];
   let net='elec';
@@ -1396,7 +1410,7 @@ function handleConn(id){
     S.conns.push({id:uid(),from:connFirst,to:id,net});
     addHist('Config',`Conectó "${a.name}" ↔ "${b.name}"`,`Red: ${net}`);
   }
-  connFirst=null;setBanner('🔗 Modo conexión — tocá el siguiente par');renderAll();renderCfg();save();
+  connFirst=null;setBanner('Modo conexión — tocá el primer elemento');renderAll();renderCfg();save();
 }
 
 // ── DRAW ───────────────────────────────────────────────────
@@ -1926,7 +1940,10 @@ window.addEventListener('DOMContentLoaded', function(){
     if(near.length===1){if(connMode){handleConn(near[0].id);return;}var el2=near[0];if(JUNC.includes(el2.type)&&el2.outlets)showJunc(el2.id);else if(T[el2.type]&&T[el2.type].valve)askTog(el2.id);}
     else if(near.length>1){showPicker(near,e.containerPoint);}
   });
-  map.on('dblclick',function(e){if(drawMode){finishDraw();e.originalEvent.preventDefault();}});
+  map.on('dblclick',function(e){
+    if(drawMode){finishDraw();e.originalEvent.preventDefault();return;}
+    if(connMode){exitAll();setBanner(null);showToast('✅','Conexión finalizada','Modo conexión desactivado.');e.originalEvent.preventDefault();return;}
+  });
   // ── INIT ───────────────────────────────────────────────────
 (function(){
   try{
