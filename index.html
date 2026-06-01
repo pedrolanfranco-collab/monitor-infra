@@ -967,7 +967,7 @@ function simTog(id){
 function askTog(id){
   const el=S.elems[id];if(!el)return;
   togPending=id;
-  const ns=!el.on;const isSrc=T[el.type]?.src;
+  const ns=!el.on;const isSrc=T[el.type]&&T[el.type].src;
   document.getElementById('mt-title').textContent=(ns?(isSrc?'ENCENDER ':'ABRIR '):(isSrc?'APAGAR ':'CERRAR '))+el.name.toUpperCase();
   document.getElementById('mt-id').value=id;
   const changes=simTog(id);
@@ -991,7 +991,7 @@ function confirmTog(){
 // ── RENDER MAP ─────────────────────────────────────────────
 function renderAll(){
   if(!elemL||!baseL)return; // mapa aún no inicializado
-  if(document.getElementById('pv-red')?.classList.contains('on'))renderRed();
+  var _pvr=document.getElementById('pv-red');if(_pvr&&_pvr.classList.contains('on'))renderRed();
   var{energized,watered}=calcStates();
   elemL.clearLayers();
   var _count=0;
@@ -1030,12 +1030,7 @@ function renderAll(){
       const ss=el.salidas?` · ${el.salidas} sal`:'';
       m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
     }
-    m.on('click',function(ev){
-      if(connMode){L.DomEvent.stopPropagation(ev);handleConn(el.id);return;}
-      if(JUNC.includes(el.type)&&el.outlets&&el.outlets.length>0)showJunc(el.id);
-      else if(ti&&ti.valve)askTog(el.id);
-      else if(el.type==='bebedero'){L.DomEvent.stopPropagation(ev);showBebederoMenu(el.id);}
-    });
+    m.on('click',function(ev){if(connMode){L.DomEvent.stopPropagation(ev);handleConn(el.id);return;}if(JUNC.includes(el.type)&&el.outlets&&el.outlets.length>0)showJunc(el.id);else if(ti&&ti.valve)askTog(el.id);});
     m.addTo(elemL);
     _count++;
   });
@@ -1322,73 +1317,6 @@ function locateElem(id){
   setTimeout(function(){map.removeLayer(pulse);},3000);
 }
 // Distancia metros de punto P al segmento A-B
-// Menú de bebedero: muestra su llave asociada para operar
-function showBebederoMenu(id){
-  var beb=S.elems[id];if(!beb)return;
-  var st=calcStates();
-  var hasWater=st.watered.has(id);
-
-  // Buscar llaves conectadas directamente al bebedero
-  var llaves=[];
-  S.conns.forEach(function(cn){
-    var oid=(cn.from===id)?cn.to:(cn.to===id)?cn.from:null;
-    if(!oid)return;
-    var other=S.elems[oid];
-    if(other&&T[other.type]&&T[other.type].valve)llaves.push(other);
-  });
-
-  // Si no hay llave directa, buscar un salto (llave→T/Cruz→bebedero)
-  if(!llaves.length){
-    var midIds=[];
-    S.conns.forEach(function(cn){
-      var oid=(cn.from===id)?cn.to:(cn.to===id)?cn.from:null;
-      if(oid&&JUNC.includes((S.elems[oid]||{}).type))midIds.push(oid);
-    });
-    midIds.forEach(function(mid){
-      S.conns.forEach(function(cn2){
-        var oid2=(cn2.from===mid)?cn2.to:(cn2.to===mid)?cn2.from:null;
-        if(!oid2||oid2===id)return;
-        var other=S.elems[oid2];
-        if(other&&T[other.type]&&T[other.type].valve)llaves.push(other);
-      });
-    });
-    var seen={};llaves=llaves.filter(function(l){if(seen[l.id])return false;seen[l.id]=true;return true;});
-  }
-
-  if(!llaves.length){
-    showToast('🐄',beb.name,hasWater?'CON AGUA — sin llave directa conectada.':'SIN AGUA — sin llave directa conectada.');
-    return;
-  }
-
-  // Una sola llave: operar directo
-  if(llaves.length===1){askTog(llaves[0].id);return;}
-
-  // Varias llaves: mostrar popup selector
-  var pop=document.getElementById('m-beb-pop');
-  if(!pop){
-    pop=document.createElement('div');pop.id='m-beb-pop';
-    pop.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:900;background:var(--surf);border:1px solid var(--brd2);border-radius:10px;min-width:240px;max-width:300px;box-shadow:0 12px 40px rgba(0,0,0,.7);overflow:hidden;display:none';
-    document.body.appendChild(pop);
-  }
-  var html='<div style="background:var(--surf2);border-bottom:2px solid var(--brd2);padding:10px 14px;font-family:var(--cond);font-size:11px;font-weight:700;color:var(--cyan)">🐄 '+beb.name+' — Elegir llave</div><div>';
-  llaves.forEach(function(lv){
-    var ti2=T[lv.type]||{ico:'?',lbl:''};
-    html+='<div data-lv="'+lv.id+'" class="beb-lv-row" style="display:flex;align-items:center;gap:8px;padding:10px;cursor:pointer;border-bottom:1px solid var(--brd)">'+
-      '<span style="font-size:15px">'+ti2.ico+'</span>'+
-      '<div style="flex:1"><div style="font-size:12px;font-weight:600">'+lv.name+'</div>'+
-      '<div style="font-size:9px;color:var(--txt2)">'+ti2.lbl+' · S'+(lv.sistema||1)+'</div></div>'+
-      '<span style="font-size:11px;font-weight:700;color:'+(lv.on?'var(--blue)':'var(--red)')+'">'+( lv.on?'ABIERTA':'CERRADA')+'</span></div>';
-  });
-  html+='</div><div onclick="document.getElementById(\'m-beb-pop\').style.display=\'none\';" style="padding:8px;text-align:center;font-size:11px;font-family:var(--cond);color:var(--txt2);cursor:pointer">Cancelar</div>';
-  pop.innerHTML=html;pop.style.display='block';
-  var rows=pop.querySelectorAll('.beb-lv-row');
-  for(var ri=0;ri<rows.length;ri++){
-    (function(row){row.addEventListener('click',function(){
-      pop.style.display='none';askTog(row.getAttribute('data-lv'));
-    });})(rows[ri]);
-  }
-}
-
 function distPtoSeg(plat,plng,alat,alng,blat,blng){
   var cos=Math.cos(plat*Math.PI/180);
   var R=111320; // metros por grado lat
@@ -2009,14 +1937,7 @@ window.addEventListener('DOMContentLoaded', function(){
     if(addMode){exitAll();showAdd(e.latlng);return;}
     if(moveMode&&moveId){var el=S.elems[moveId];if(el){el.geom={...el.geom,lat:e.latlng.lat,lng:e.latlng.lng};addHist('Config','Movió "'+el.name+'" a nueva posición');if(JUNC.includes(el.type))autoInsertInConn(moveId,e.latlng);}exitAll();renderAll();renderCfg();save();return;}
     var near=Object.values(S.elems).filter(function(el){if(!el.geom||el.geom.type==='Polygon')return false;return map.distance(e.latlng,L.latLng(el.geom.lat,el.geom.lng))<50;});
-    if(near.length===1){
-      if(connMode){handleConn(near[0].id);return;}
-      var el2=near[0];
-      if(JUNC.includes(el2.type)&&el2.outlets&&el2.outlets.length>0)showJunc(el2.id);
-      else if(T[el2.type]&&T[el2.type].valve)askTog(el2.id);
-      else if(el2.type==='bebedero')showBebederoMenu(el2.id);
-      else showEdit(el2.id);
-    }
+    if(near.length===1){if(connMode){handleConn(near[0].id);return;}var el2=near[0];if(JUNC.includes(el2.type)&&el2.outlets)showJunc(el2.id);else if(T[el2.type]&&T[el2.type].valve)askTog(el2.id);}
     else if(near.length>1){showPicker(near,e.containerPoint);}
   });
   map.on('dblclick',function(e){
