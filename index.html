@@ -69,7 +69,6 @@ body{display:flex;flex-direction:column}
 .sec-estado .sec-hdr::before{background:var(--green2)}
 .sec-llaves .sec-hdr::before{background:var(--blue)}
 .sec-infra .sec-hdr::before{background:var(--txt2)}
-.sec-pot .sec-hdr::before{background:var(--green)}
 .sec-title{font-family:var(--cond);font-size:11px;font-weight:700;letter-spacing:1px;color:var(--txt);flex:1;text-transform:uppercase}
 .sec-badge{font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:10px;background:var(--bg2);border:1px solid var(--brd2);color:var(--txt2);flex-shrink:0}
 .sec-arrow{font-size:10px;color:var(--txt3);transition:transform .2s;flex-shrink:0;line-height:1}
@@ -360,21 +359,6 @@ body{display:flex;flex-direction:column}
           </div>
           <div class="sec-body">
             <div class="half" id="infra-list"><div class="es" style="padding:10px"><div class="bi" style="font-size:16px">💧</div>Sin elementos.</div></div>
-          </div>
-        </div>
-
-        <!-- SECCIÓN: Potreros -->
-        <div class="sec sec-pot" id="sec-pot">
-          <div class="sec-hdr" onclick="toggleSec('sec-pot')">
-            <span style="font-size:13px">&#127807;</span>
-            <span class="sec-title">Potreros</span>
-            <span class="sec-badge" id="badge-pot">--</span>
-            <span class="sec-arrow">&#9660;</span>
-          </div>
-          <div class="sec-body">
-            <div style="padding:6px;max-height:400px;overflow-y:auto" id="panel-pot-list">
-              <div class="es">Sin potreros.</div>
-            </div>
           </div>
         </div>
 
@@ -1067,42 +1051,62 @@ function setConnFilter(f,btn){
 }
 
 function renderLlaves(en,wa){
-  const ll=Object.values(S.elems).filter(e=>T[e.type]?.valve);
-  const d=document.getElementById('llave-list');
-  if(!ll.length){d.innerHTML='<div class="es"><div class="bi">🔌</div>Sin llaves.<br>Importá KMZ en Config.</div>';return;}
-  d.innerHTML=ll.map(el=>{
-    const ti=T[el.type];const isJunc=JUNC.includes(el.type)&&el.outlets;const isSrc=ti?.src;
-    if(isJunc){
-      const juncRows=el.outlets.map((o,i)=>{
-        const isWater=ti.net==='agua'||ti.net==='both';
-        const flowing=(isWater?wa:en).has(el.id)&&o.open;
-        return `<div class="ei" style="padding:6px 8px 6px 14px;border-left:2px solid ${o.open?'#42a5f5':'#ef5350'}" onclick="toggleOutlet('${el.id}',${i})">
-          <span class="ei-ico" style="font-size:12px;color:${o.open?'#42a5f5':'#ef5350'}">${isWater?'🚰':'🔌'}</span>
-          <div class="ei-info">
-            <div class="ei-name" style="font-size:11px">${el.name} — ${o.name||'Sal.'+(i+1)}</div>
-            <div class="ei-sub">${ti.lbl} · S${el.sistema||1} · ${flowing?'💧 FLUYE':'⛔ CORTADA'}</div>
-          </div>
-          <button class="vbtn ${o.open?'vo':'vc'}" onclick="event.stopPropagation();toggleOutlet('${el.id}',${i})">${o.open?'ABIERTA':'CERRADA'}</button>
-        </div>`;
-      }).join('');
-      return `<div style="background:var(--surf);border:1px solid var(--brd);border-radius:6px;margin-bottom:4px;overflow:hidden">
-        <div style="padding:6px 8px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="showJunc('${el.id}')">
-          <span style="font-size:14px">${ti.ico}</span>
-          <div style="flex:1"><div style="font-size:12px;font-weight:600">${el.name}</div><div style="font-family:var(--mono);font-size:9px;color:var(--txt2)">${ti.lbl} · S${el.sistema||1} · ${el.outlets.length} salidas</div></div>
-          <button class="loc-btn" onclick="event.stopPropagation();locateElem('${el.id}')" title="Ver en mapa">📍</button>
-        </div>
-        ${juncRows}
-      </div>`;
+  var ll=Object.values(S.elems).filter(function(e){return T[e.type]&&T[e.type].valve;});
+  var d=document.getElementById('llave-list');
+  if(!ll.length){d.innerHTML='<div class="es"><div class="bi">&#128268;</div>Sin llaves.<br>Import&#225; KMZ en Config.</div>';return;}
+
+  // Construir mapa de adyacencia para encontrar bebedero asociado a cada llave
+  var adj={};
+  S.conns.forEach(function(cn){
+    if(!adj[cn.from])adj[cn.from]=[];
+    if(!adj[cn.to])adj[cn.to]=[];
+    adj[cn.from].push(cn.to);
+    adj[cn.to].push(cn.from);
+  });
+
+  var html='';
+  ll.forEach(function(el){
+    var ti=T[el.type]||{ico:'?',lbl:el.type,net:'agua'};
+    var isJunc=JUNC.includes(el.type)&&el.outlets&&el.outlets.length>0;
+    var isSrc=ti.src;
+    var flowing=isSrc?el.on:(ti.net==='agua'?wa:en).has(el.id);
+    var isJuncNoOutlets=JUNC.includes(el.type)&&(!el.outlets||el.outlets.length===0);
+
+    // Buscar bebederos conectados a esta llave
+    var connBeb=(adj[el.id]||[]).filter(function(nid){
+      return S.elems[nid]&&S.elems[nid].type==='bebedero';
+    }).map(function(nid){return S.elems[nid];});
+
+    // Item principal de la llave
+    html+='<div class="ei" style="cursor:pointer;border-left:3px solid '+(el.on?'var(--blue)':'var(--red)')+'">'+
+      '<span class="ei-ico" style="font-size:15px">'+ti.ico+'</span>'+
+      '<div class="ei-info" style="cursor:pointer" onclick="'+(isJunc?'showJunc(\''+el.id+'\')':isJuncNoOutlets?'':'askTog(\''+el.id+'\')')+'">'+
+        '<div class="ei-name">'+el.name+'</div>'+
+        '<div class="ei-sub">'+ti.lbl+' &middot; S'+(el.sistema||1)+(isJuncNoOutlets?' &middot; <span style="color:var(--amber)">sin salidas</span>':'')+'</div>'+
+      '</div>'+
+      '<button class="loc-btn" onclick="event.stopPropagation();locateElem(\''+el.id+'\')" title="Ver en mapa">&#128205;</button>'+
+      (isJuncNoOutlets?'<button class="loc-btn" onclick="event.stopPropagation();insertExistingInConn(\''+el.id+'\')" title="Conectar a l&#237;nea cercana" style="border-color:var(--cyan);color:var(--cyan)">&#128279;</button>':'')+ 
+      (!isJunc&&!isJuncNoOutlets&&ti.valve?'<button class="vbtn '+(el.on?'vo':'vc')+'" onclick="event.stopPropagation();askTog(\''+el.id+'\')">'+(el.on?'ABIERTA':'CERRADA')+'</button>':'')+
+    '</div>';
+
+    // Mostrar bebederos conectados con su estado de agua
+    if(connBeb.length>0){
+      connBeb.forEach(function(beb){
+        var hasWater=wa.has(beb.id);
+        html+='<div class="ei" style="padding:4px 8px 4px 24px;background:var(--bg2);border-top:1px solid var(--brd);border-left:3px solid '+(hasWater?'var(--cyan)':'var(--red)')+'">'+
+          '<span class="ei-ico" style="font-size:12px">&#129699;</span>'+
+          '<div class="ei-info">'+
+            '<div class="ei-name" style="font-size:11px">'+beb.name+'</div>'+
+            '<div class="ei-sub" style="color:'+(hasWater?'var(--cyan)':'var(--red)')+'">Bebedero &middot; '+(hasWater?'CON AGUA':'SIN AGUA')+'</div>'+
+          '</div>'+
+          '<button class="loc-btn" onclick="event.stopPropagation();locateElem(\''+beb.id+'\')" title="Ver en mapa" style="font-size:9px">&#128205;</button>'+
+        '</div>';
+      });
     }
-    const flowing=isSrc?el.on:(ti.net==='agua'?wa:en).has(el.id);
-    return `<div class="ei" style="${ti.valve?'cursor:pointer':''}">
-      <span class="ei-ico" onclick="${ti.valve?`askTog('${el.id}')`:''}">${ti.ico}</span>
-      <div class="ei-info" onclick="${ti.valve?`askTog('${el.id}')`:''}" style="cursor:pointer"><div class="ei-name">${el.name}</div><div class="ei-sub">${ti.lbl} · S${el.sistema||1}</div></div>
-      <button class="loc-btn" onclick="event.stopPropagation();locateElem('${el.id}')" title="Ver en mapa">📍</button>
-      ${ti.valve?`<button class="vbtn ${el.on?'vo':'vc'}" onclick="event.stopPropagation();askTog('${el.id}')">${el.on?'ABIERTA':'CERRADA'}</button>`:''}
-    </div>`;
-  }).join('');
+  });
+  d.innerHTML=html;
 }
+
 
 function renderInfra(){
   const nonValve=Object.values(S.elems).filter(e=>!T[e.type]?.valve&&e.type!=='potrero');
@@ -1122,55 +1126,23 @@ function renderInfra(){
 }
 
 function renderStats(en,wa){
-  var pts=Object.values(S.elems).filter(function(e){return e.type==='potrero';});
-  var eo=pts.filter(function(p){return en.has(p.id);}).length;
-  var wo=pts.filter(function(p){return wa.has(p.id);}).length;
+  const pts=Object.values(S.elems).filter(e=>e.type==='potrero');
+  const eo=pts.filter(p=>en.has(p.id)).length;
+  const wo=pts.filter(p=>wa.has(p.id)).length;
   document.getElementById('s-eo').textContent=eo;
   document.getElementById('s-en').textContent=pts.length-eo;
   document.getElementById('s-ao').textContent=wo;
   document.getElementById('s-an').textContent=pts.length-wo;
+  // Badges de secciones
   var b=document.getElementById('badge-estado');
-  if(b)b.textContent=pts.length?(eo+'/'+pts.length+' elec  '+wo+'/'+pts.length+' agua'):'--';
-  var ll=Object.values(S.elems).filter(function(e){return T[e.type]&&T[e.type].valve;});
+  if(b)b.textContent=pts.length?`${eo}/${pts.length} ⚡  ${wo}/${pts.length} 💧`:'—';
+  var ll=Object.values(S.elems).filter(e=>T[e.type]&&T[e.type].valve);
   var bl=document.getElementById('badge-llaves');
-  if(bl)bl.textContent=ll.length?ll.length+' llaves':'--';
-  var ni=Object.values(S.elems).filter(function(e){return T[e.type]&&!T[e.type].valve&&e.type!=='potrero';});
+  if(bl)bl.textContent=ll.length?ll.length+' llaves':'—';
+  var ni=Object.values(S.elems).filter(e=>!T[e.type]?.valve&&e.type!=='potrero');
   var bi=document.getElementById('badge-infra');
-  if(bi)bi.textContent=ni.length?ni.length+' elem':'--';
-  var bp=document.getElementById('badge-pot');
-  if(bp)bp.textContent=pts.length?(wo+'/'+pts.length+' agua'):'--';
-  renderPanelPot(pts,en,wa);
+  if(bi)bi.textContent=ni.length?ni.length+' elem':'—';
 }
-
-function renderPanelPot(pts,en,wa){
-  var d=document.getElementById('panel-pot-list');
-  if(!d)return;
-  if(!pts||!pts.length){d.innerHTML='<div class="es">Sin potreros.</div>';return;}
-  var sorted=pts.slice().sort(function(a,b){return a.name.localeCompare(b.name,'es');});
-  var html='';
-  sorted.forEach(function(p){
-    var hE=en.has(p.id),hW=wa.has(p.id);
-    var ok=hE&&hW,parcial=hE||hW;
-    var col=ok?'var(--green2)':parcial?'var(--amber)':'var(--red)';
-    var dot=ok?'&#9679;':parcial?'&#9681;':'&#9675;';
-    var lbl=ok?'OK':(!hW&&!hE?'Sin servicio':(!hW?'Sin agua':'Sin energia'));
-    html+='<div class="ei pot-row" data-pid="'+p.id+'" style="padding:5px 8px;cursor:pointer">'+
-      '<span class="ei-ico" style="font-size:13px;color:'+col+'">'+dot+'</span>'+
-      '<div class="ei-info">'+
-        '<div class="ei-name" style="font-size:11px">'+p.name+'</div>'+
-        '<div class="ei-sub" style="color:'+col+'">'+lbl+'</div>'+
-      '</div>'+
-    '</div>';
-  });
-  d.innerHTML=html;
-  var rows=d.querySelectorAll('.pot-row');
-  for(var i=0;i<rows.length;i++){
-    (function(row){
-      row.addEventListener('click',function(){locateElem(row.getAttribute('data-pid'));});
-    })(rows[i]);
-  }
-}
-
 
 function updateHdr(en,wa){
   const pts=Object.values(S.elems).filter(e=>e.type==='potrero');
