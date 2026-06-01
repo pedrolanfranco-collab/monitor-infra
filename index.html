@@ -967,7 +967,7 @@ function simTog(id){
 function askTog(id){
   const el=S.elems[id];if(!el)return;
   togPending=id;
-  const ns=!el.on;const isSrc=T[el.type]&&T[el.type].src;
+  const ns=!el.on;const isSrc=T[el.type]?.src;
   document.getElementById('mt-title').textContent=(ns?(isSrc?'ENCENDER ':'ABRIR '):(isSrc?'APAGAR ':'CERRAR '))+el.name.toUpperCase();
   document.getElementById('mt-id').value=id;
   const changes=simTog(id);
@@ -991,7 +991,7 @@ function confirmTog(){
 // ── RENDER MAP ─────────────────────────────────────────────
 function renderAll(){
   if(!elemL||!baseL)return; // mapa aún no inicializado
-  var _pvr=document.getElementById('pv-red');if(_pvr&&_pvr.classList.contains('on'))renderRed();
+  if(document.getElementById('pv-red')?.classList.contains('on'))renderRed();
   var{energized,watered}=calcStates();
   elemL.clearLayers();
   var _count=0;
@@ -1169,14 +1169,19 @@ function renderCfg(){
   const el=document.getElementById('cfg-el');
   const items=Object.values(S.elems).sort((a,b)=>a.name.localeCompare(b.name,'es'));
   if(!items.length){el.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';return;}
-  el.innerHTML=items.map(e=>`
-    <div class="cfg-row">
-      <span style="font-size:13px">${T[e.type]?.ico||'?'}</span>
-      <span style="flex:1;font-size:11px">${e.name}</span>
-      <button onclick="startMove('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">📍</button>
-      <button onclick="showEdit('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">✏️</button>
-      <button onclick="delElem('${e.id}')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>
-    </div>`).join('');
+  el.innerHTML=items.map(function(e){
+    var ico=T[e.type]&&T[e.type].ico?T[e.type].ico:'?';
+    var canInsert=JUNC.includes(e.type)||e.type==='llave_agua'||e.type==='llave_elec';
+    var insertBtn=canInsert?'<button onclick="insertExistingInConn(\''+e.id+'\')" title="Insertar en línea cercana" style="background:transparent;border:none;color:var(--cyan);font-size:10px;cursor:pointer;font-family:var(--mono)">🔗</button>':'';
+    return '<div class="cfg-row">'+
+      '<span style="font-size:13px">'+ico+'</span>'+
+      '<span style="flex:1;font-size:11px">'+e.name+'</span>'+
+      insertBtn+
+      '<button onclick="startMove(\''+e.id+'\')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">📍</button>'+
+      '<button onclick="showEdit(\''+e.id+'\')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">✏️</button>'+
+      '<button onclick="delElem(\''+e.id+'\')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>'+
+    '</div>';
+  }).join('');
   const cl=document.getElementById('cfg-cl');
   if(!S.conns.length){cl.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin conexiones</div>';return;}
   cl.innerHTML=S.conns.filter(c=>{
@@ -1284,8 +1289,9 @@ function saveElem(){
   const isNew=!ex;
   S.elems[id]={id,type,name,sistema:sist,on,salidas,outlets,geom:ex?.geom||dg,fromKMZ:ex?.fromKMZ||false};
   pendingGeom=null;document._ll=null;closeM('m-elem');
-  // Auto-insertar en conexión existente si es T/Cruz nueva colocada en el mapa
-  if(isNew && JUNC.includes(type) && ll){
+  // Auto-insertar en conexión si es T/Cruz O llave simple colocada sobre una línea
+  const canAutoInsert=JUNC.includes(type)||type==='llave_agua'||type==='llave_elec';
+  if(isNew && canAutoInsert && ll){
     autoInsertInConn(id, ll);
   }
   renderAll();save();
@@ -1317,6 +1323,44 @@ function locateElem(id){
   setTimeout(function(){map.removeLayer(pulse);},3000);
 }
 // Distancia metros de punto P al segmento A-B
+// Insertar elemento YA EXISTENTE en la línea más cercana (radio 200m)
+function insertExistingInConn(id){
+  var el=S.elems[id];
+  if(!el||!el.geom){showToast('⚠️','Sin posición','El elemento no tiene coordenadas.');return;}
+  var canInsert=JUNC.includes(el.type)||el.type==='llave_agua'||el.type==='llave_elec';
+  if(!canInsert){showToast('⚠️','No aplica','Solo llaves y T/Cruz se pueden insertar en líneas.');return;}
+  var ll={lat:el.geom.lat,lng:el.geom.lng};
+  var elNet=(T[el.type]||{}).net||'agua';
+  var SNAP=200;
+  var best=null,bestDist=SNAP;
+  S.conns.forEach(function(c){
+    if(c.from===id||c.to===id)return;
+    if(c.net!==elNet&&elNet!=='both'&&c.net!=='both')return;
+    var a=S.elems[c.from],b=S.elems[c.to];
+    if(!a||!b||!a.geom||!b.geom)return;
+    var d=distPtoSeg(ll.lat,ll.lng,a.geom.lat,a.geom.lng,b.geom.lat,b.geom.lng);
+    if(d<bestDist){bestDist=d;best=c;}
+  });
+  if(!best){showToast('⚠️','Sin línea cercana','No hay conexiones a menos de 200m.');return;}
+  var fromId=best.from,toId=best.to,net=best.net;
+  var fromName=S.elems[fromId]?S.elems[fromId].name:'?';
+  var toName=S.elems[toId]?S.elems[toId].name:'?';
+  S.conns=S.conns.filter(function(c){return c.id!==best.id;});
+  S.conns.push({id:uid(),from:fromId,to:id,net:net});
+  S.conns.push({id:uid(),from:id,to:toId,net:net});
+  el.on=true;
+  if(el.outlets){
+    var total=S.conns.filter(function(c){return c.from===id||c.to===id;}).length;
+    var needed=Math.max(total,el.salidas||2);
+    while(el.outlets.length<needed)el.outlets.push({open:true,name:'Salida '+(el.outlets.length+1)});
+    el.salidas=needed;
+    el.outlets.forEach(function(o){o.open=true;});
+  }
+  addHist('Config','Insertó "'+el.name+'" en '+fromName+' ↔ '+toName,'Red: '+net);
+  renderAll();renderCfg();save();
+  showToast('✅','Insertado','"'+el.name+'" en '+fromName+' ↔ '+toName+' ('+Math.round(bestDist)+'m)');
+}
+
 function distPtoSeg(plat,plng,alat,alng,blat,blng){
   var cos=Math.cos(plat*Math.PI/180);
   var R=111320; // metros por grado lat
@@ -1935,7 +1979,7 @@ window.addEventListener('DOMContentLoaded', function(){
       return;
     }
     if(addMode){exitAll();showAdd(e.latlng);return;}
-    if(moveMode&&moveId){var el=S.elems[moveId];if(el){el.geom={...el.geom,lat:e.latlng.lat,lng:e.latlng.lng};addHist('Config','Movió "'+el.name+'" a nueva posición');if(JUNC.includes(el.type))autoInsertInConn(moveId,e.latlng);}exitAll();renderAll();renderCfg();save();return;}
+    if(moveMode&&moveId){var el=S.elems[moveId];if(el){el.geom={...el.geom,lat:e.latlng.lat,lng:e.latlng.lng};addHist('Config','Movió "'+el.name+'" a nueva posición');var canIns=JUNC.includes(el.type)||el.type==='llave_agua'||el.type==='llave_elec';if(canIns)autoInsertInConn(moveId,e.latlng);}exitAll();renderAll();renderCfg();save();return;}
     var near=Object.values(S.elems).filter(function(el){if(!el.geom||el.geom.type==='Polygon')return false;return map.distance(e.latlng,L.latLng(el.geom.lat,el.geom.lng))<50;});
     if(near.length===1){if(connMode){handleConn(near[0].id);return;}var el2=near[0];if(JUNC.includes(el2.type)&&el2.outlets)showJunc(el2.id);else if(T[el2.type]&&T[el2.type].valve)askTog(el2.id);}
     else if(near.length>1){showPicker(near,e.containerPoint);}
