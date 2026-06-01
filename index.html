@@ -268,7 +268,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v54</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v55</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -1376,12 +1376,15 @@ function startMove(id){exitAll();moveMode=true;moveId=id;setBanner(`📍 Tocá l
 function startConn(){exitAll();connMode=true;connFirst=null;setBanner('Modo conexión — tocá el primer elemento');goTab('mapa',document.querySelector('.tab'));}
 
 function handleConn(id){
-  if(!connFirst){connFirst=id;setBanner('"'+S.elems[id].name+'" → tocá el segundo elemento · Toque largo o doble toque para cancelar');return;}
-  // Doble toque en el mismo elemento = cancelar modo conexión
+  if(!connFirst){
+    connFirst=id;
+    setBanner('"'+S.elems[id].name+'" seleccionado → tocá el segundo elemento');
+    return;
+  }
+  // Doble toque en el mismo elemento = deseleccionar (no cancelar el modo)
   if(connFirst===id){
-    exitAll();
-    setBanner('');
-    showToast('✅','Conexión finalizada','Modo conexión desactivado.');
+    connFirst=null;
+    setBanner('Modo conexión — tocá el primer elemento');
     return;
   }
   const a=S.elems[connFirst],b=S.elems[id];
@@ -1389,12 +1392,16 @@ function handleConn(id){
   let net='elec';
   if(wt.includes(a.type)||wt.includes(b.type))net='agua';
   if(a.type==='potrero'||b.type==='potrero')net='both';
-  if(!S.conns.find(c=>(c.from===connFirst&&c.to===id)||(c.from===id&&c.to===connFirst))){
+  if(!S.conns.find(function(c){return (c.from===connFirst&&c.to===id)||(c.from===id&&c.to===connFirst);})){
     S.conns.push({id:uid(),from:connFirst,to:id,net});
     addHist('Config','Conectó "'+a.name+'" ↔ "'+b.name+'"','Red: '+net);
     showToast('🔗','Conexión creada','"'+a.name+'" ↔ "'+b.name+'" ['+net+']');
+  } else {
+    showToast('ℹ️','Ya conectados','"'+a.name+'" y "'+b.name+'" ya tienen conexión.');
   }
-  connFirst=null;setBanner('Modo conexión — tocá el primer elemento · Tocá el mismo elemento dos veces para salir');renderAll();renderCfg();save();
+  connFirst=null;
+  setBanner('Modo conexión — tocá el siguiente par · Doble toque en mapa vacío para salir');
+  renderAll();renderCfg();save();
 }
 
 // ── DRAW ───────────────────────────────────────────────────
