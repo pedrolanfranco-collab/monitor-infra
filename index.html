@@ -268,7 +268,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v52</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v53</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -863,12 +863,16 @@ function goTab(name,btn){
 }
 
 // ── BANNER ─────────────────────────────────────────────────
-function setBanner(msg,bg='#1a2a0a'){
-  const b=document.getElementById('banner');
-  if(!msg){b.style.display='none';return;}
-  b.style.display='block';b.style.background=bg;
+function setBanner(msg,bg){
+  bg=bg||'#1a2a0a';
+  var b=document.getElementById('banner');
+  if(!msg){b.style.display='none';b.innerHTML='';return;}
+  b.style.display='flex';b.style.background=bg;
+  b.style.alignItems='center';b.style.justifyContent='space-between';
   b.style.color=bg.includes('6b')||bg.includes('1a6')?'#c8e6c9':'#fff';
-  b.textContent=msg;
+  var showExit=connMode||addMode||moveMode||drawMode;
+  b.innerHTML='<span style="flex:1">'+msg+'</span>'
+    +(showExit?'<button onclick="exitAll();setBanner(\'\');" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:2px 10px;font-size:12px;cursor:pointer;font-family:var(--cond);font-weight:700;margin-left:8px;flex-shrink:0">✕ SALIR</button>':'');
 }
 
 // ── EXIT ALL MODES ─────────────────────────────────────────
@@ -1371,11 +1375,18 @@ function askResetAll(){
 // ── MODES ──────────────────────────────────────────────────
 function startAddMode(){exitAll();addMode=true;setBanner('📍 Tocá el mapa donde agregar el elemento','#1a6b2a');goTab('mapa',document.querySelector('.tab'));}
 function startMove(id){exitAll();moveMode=true;moveId=id;setBanner(`📍 Tocá la nueva ubicación de "${S.elems[id]?.name}"`, '#1a3a6b');goTab('mapa',document.querySelector('.tab'));}
-function startConn(){exitAll();connMode=true;connFirst=null;setBanner('Modo conexión — tocá el primer elemento');goTab('mapa',document.querySelector('.tab'));}
+function startConn(){exitAll();connMode=true;connFirst=null;setBanner('🔗 Modo conexión — tocá el primer elemento · Doble toque en mapa vacío para salir');goTab('mapa',document.querySelector('.tab'));}
+
+// Escape para salir de cualquier modo activo
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&(connMode||addMode||moveMode||drawMode)){
+    exitAll();setBanner('');
+  }
+});
 
 function handleConn(id){
   if(!connFirst){connFirst=id;setBanner(`"${S.elems[id].name}" → tocá el segundo elemento`);return;}
-  if(connFirst===id){connFirst=null;setBanner('Tocá el primer elemento');return;}
+  if(connFirst===id){connFirst=null;setBanner('🔗 Modo conexión — tocá el primer elemento');return;}
   const a=S.elems[connFirst],b=S.elems[id];
   const wt=['tanque','llave_agua','bebedero','bomba_solar','llave_t','llave_x','distribuidor_t','distribuidor_x'];
   let net='elec';
@@ -1385,7 +1396,7 @@ function handleConn(id){
     S.conns.push({id:uid(),from:connFirst,to:id,net});
     addHist('Config',`Conectó "${a.name}" ↔ "${b.name}"`,`Red: ${net}`);
   }
-  connFirst=null;setBanner('Modo conexión — tocá el primer elemento');renderAll();renderCfg();save();
+  connFirst=null;setBanner('🔗 Modo conexión — tocá el siguiente par');renderAll();renderCfg();save();
 }
 
 // ── DRAW ───────────────────────────────────────────────────
