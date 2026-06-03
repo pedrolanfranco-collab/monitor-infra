@@ -74,7 +74,11 @@ body{display:flex;flex-direction:column}
 .sec-badge{font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:10px;background:var(--bg2);border:1px solid var(--brd2);color:var(--txt2);flex-shrink:0}
 .sec-arrow{font-size:10px;color:var(--txt3);transition:transform .2s;flex-shrink:0;line-height:1}
 .sec.collapsed .sec-arrow{transform:rotate(-90deg)}
-.sec-body{overflow:hidden;transition:max-height .3s ease;max-height:800px}
+.sec-body{overflow:hidden;transition:max-height .35s ease;max-height:2000px}
+.sec-body *::-webkit-scrollbar{width:4px}
+.sec-body *::-webkit-scrollbar-track{background:var(--bg2)}
+.sec-body *::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px}
+.sec-body *::-webkit-scrollbar-thumb:hover{background:var(--txt2)}
 .sec.collapsed .sec-body{max-height:0}
 
 /* STATUS GRID */
@@ -317,7 +321,7 @@ body{display:flex;flex-direction:column}
     <!-- MAPA -->
     <div class="pv on" id="pv-mapa">
       <div class="ph">ESTADO GENERAL</div>
-      <div style="overflow-y:auto;flex:1">
+      <div style="overflow-y:auto;flex:1;min-height:0">
 
         <!-- SECCIÓN: Resumen numérico -->
         <div class="sec sec-estado" id="sec-estado">
@@ -346,7 +350,7 @@ body{display:flex;flex-direction:column}
             <span class="sec-arrow">▼</span>
           </div>
           <div class="sec-body">
-            <div style="padding:6px" id="llave-list"><div class="es"><div class="bi">🔌</div>Sin llaves.<br>Importá un KMZ en Config.</div></div>
+            <div style="padding:6px;max-height:500px;overflow-y:auto" id="llave-list"><div class="es"><div class="bi">🔌</div>Sin llaves.<br>Importá un KMZ en Config.</div></div>
           </div>
         </div>
 
@@ -359,7 +363,7 @@ body{display:flex;flex-direction:column}
             <span class="sec-arrow">▼</span>
           </div>
           <div class="sec-body">
-            <div class="half" id="infra-list"><div class="es" style="padding:10px"><div class="bi" style="font-size:16px">💧</div>Sin elementos.</div></div>
+            <div class="half" id="infra-list" style="max-height:400px;overflow-y:auto"><div class="es" style="padding:10px"><div class="bi" style="font-size:16px">💧</div>Sin elementos.</div></div>
           </div>
         </div>
 
