@@ -1215,17 +1215,24 @@ function addHist(u,a,r){S.hist.unshift({id:uid(),user:u,action:a,result:r||'',ts
 function renderCfg(){
   document.getElementById('cfg-ec').textContent=Object.keys(S.elems).length;
   document.getElementById('cfg-cc').textContent=S.conns.length;
-  const el=document.getElementById('cfg-el');
-  const items=Object.values(S.elems).sort((a,b)=>a.name.localeCompare(b.name,'es'));
+  var el=document.getElementById('cfg-el');
+  var items=Object.values(S.elems).sort(function(a,b){return a.name.localeCompare(b.name,'es');});
   if(!items.length){el.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';return;}
-  el.innerHTML=items.map(e=>`
-    <div class="cfg-row">
-      <span style="font-size:13px">${T[e.type]?.ico||'?'}</span>
-      <span style="flex:1;font-size:11px">${e.name}</span>
-      <button onclick="startMove('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">📍</button>
-      <button onclick="showEdit('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">✏️</button>
-      <button onclick="delElem('${e.id}')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>
-    </div>`).join('');
+  el.innerHTML=items.map(function(e){
+    var ico=T[e.type]&&T[e.type].ico?T[e.type].ico:'?';
+    var canInsert=JUNC.includes(e.type)||e.type==='llave_agua'||e.type==='llave_elec';
+    var isPoly=e.type==='potrero'&&e.geom&&e.geom.type==='Polygon';
+    var insertBtn=canInsert?'<button onclick="insertExistingInConn(\''+e.id+'\')" title="Insertar en línea cercana" style="background:transparent;border:none;color:var(--cyan);font-size:10px;cursor:pointer;font-family:var(--mono)">🔗</button>':'';
+    var polyBtn=isPoly?'<button onclick="startEditPoly(\''+e.id+'\')" title="Editar vértices del polígono" style="background:transparent;border:none;color:var(--amber);font-size:10px;cursor:pointer;font-family:var(--mono)">⬡</button>':'';
+    return '<div class="cfg-row">'+
+      '<span style="font-size:13px">'+ico+'</span>'+
+      '<span style="flex:1;font-size:11px">'+e.name+'</span>'+
+      insertBtn+polyBtn+
+      '<button onclick="startMove(\''+e.id+'\')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">📍</button>'+
+      '<button onclick="showEdit(\''+e.id+'\')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">✏️</button>'+
+      '<button onclick="delElem(\''+e.id+'\')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>'+
+    '</div>';
+  }).join('');
   const cl=document.getElementById('cfg-cl');
   if(!S.conns.length){cl.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin conexiones</div>';return;}
   cl.innerHTML=S.conns.filter(c=>{
@@ -1443,41 +1450,99 @@ function askResetAll(){
   });
 }
 
+
+// ── EDITAR POLÍGONO ────────────────────────────────────────
+var editPolyId=null,editPolyMarkers=[],editPolyLine=null;
+
+function startEditPoly(id){
+  exitAll();
+  var el=S.elems[id];
+  if(!el||!el.geom||el.geom.type!=='Polygon')return;
+  editPolyId=id;
+  editPolyMarkers=[];
+  goTab('mapa',document.querySelector('.tab'));
+  // Dibujar vértices arrastrables
+  var coords=el.geom.coords.slice();
+  // Línea de preview
+  editPolyLine=L.polygon(coords,{color:'#ffb300',weight:2,fillOpacity:0.1,dashArray:'6 3'}).addTo(map);
+  // Marcadores arrastrables por cada vértice
+  coords.forEach(function(pt,i){
+    var m=L.circleMarker([pt[0],pt[1]],{
+      radius:8,color:'#ffb300',fillColor:'#fff',
+      fillOpacity:1,weight:2,draggable:true
+    }).addTo(map);
+    m._vtxIdx=i;
+    m.on('mousedown',function(){map.dragging.disable();});
+    m.on('mouseup',function(){map.dragging.enable();});
+    m.on('drag',function(e){
+      var ll=e.latlng||e.target.getLatLng();
+      m.setLatLng(ll);
+      // Actualizar línea de preview
+      var newCoords=editPolyMarkers.map(function(mk){
+        var lll=mk.getLatLng();return[lll.lat,lll.lng];
+      });
+      editPolyLine.setLatLngs(newCoords);
+    });
+    editPolyMarkers.push(m);
+  });
+  map.fitBounds(editPolyLine.getBounds(),{padding:[40,40]});
+  setBanner('&#9998; Arrastrá los vértices · [Guardar] o [Cancelar]','#3a2a00');
+  // Botones en el banner
+  var b=document.getElementById('banner');
+  if(b){
+    var saveBtn=document.createElement('button');
+    saveBtn.textContent='Guardar';
+    saveBtn.style.cssText='background:var(--green);border:none;color:#fff;border-radius:4px;padding:2px 12px;font-size:12px;cursor:pointer;margin-left:8px;font-weight:700';
+    saveBtn.onclick=function(){finishEditPoly();};
+    var cancelBtn=document.createElement('button');
+    cancelBtn.textContent='Cancelar';
+    cancelBtn.style.cssText='background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:2px 10px;font-size:12px;cursor:pointer;margin-left:4px';
+    cancelBtn.onclick=function(){cancelEditPoly();};
+    b.appendChild(saveBtn);
+    b.appendChild(cancelBtn);
+  }
+}
+
+function finishEditPoly(){
+  if(!editPolyId||!editPolyMarkers.length)return;
+  var newCoords=editPolyMarkers.map(function(m){
+    var ll=m.getLatLng();return[ll.lat,ll.lng];
+  });
+  var lat=newCoords.reduce(function(s,c){return s+c[0];},0)/newCoords.length;
+  var lng=newCoords.reduce(function(s,c){return s+c[1];},0)/newCoords.length;
+  S.elems[editPolyId].geom={type:'Polygon',coords:newCoords,lat:lat,lng:lng};
+  addHist('Config','Editó polígono "'+S.elems[editPolyId].name+'"',''+newCoords.length+' vértices');
+  cancelEditPoly();
+  renderAll();save();
+  showToast('✅','Polígono guardado','El polígono fue actualizado correctamente.');
+}
+
+function cancelEditPoly(){
+  editPolyMarkers.forEach(function(m){map.removeLayer(m);});
+  editPolyMarkers=[];
+  if(editPolyLine){map.removeLayer(editPolyLine);editPolyLine=null;}
+  editPolyId=null;
+  setBanner(null);
+}
+
 // ── MODES ──────────────────────────────────────────────────
 function startAddMode(){exitAll();addMode=true;setBanner('📍 Tocá el mapa donde agregar el elemento','#1a6b2a');goTab('mapa',document.querySelector('.tab'));}
 function startMove(id){exitAll();moveMode=true;moveId=id;setBanner(`📍 Tocá la nueva ubicación de "${S.elems[id]?.name}"`, '#1a3a6b');goTab('mapa',document.querySelector('.tab'));}
 function startConn(){exitAll();connMode=true;connFirst=null;setBanner('Modo conexión — tocá el primer elemento');goTab('mapa',document.querySelector('.tab'));}
 
 function handleConn(id){
-  if(!connFirst){
-    connFirst=id;
-    setBanner('"'+S.elems[id].name+'" seleccionado → tocá el segundo elemento');
-    return;
-  }
-  if(connFirst===id){
-    connFirst=null;
-    setBanner('Modo conexión — tocá el primer elemento');
-    return;
-  }
-  var a=S.elems[connFirst],b=S.elems[id];
-  var wt=['tanque','llave_agua','bebedero','bomba_solar','llave_t','llave_x','distribuidor_t','distribuidor_x'];
-  var net='elec';
+  if(!connFirst){connFirst=id;setBanner(`"${S.elems[id].name}" → tocá el segundo elemento`);return;}
+  if(connFirst===id){connFirst=null;setBanner('Tocá el primer elemento');return;}
+  const a=S.elems[connFirst],b=S.elems[id];
+  const wt=['tanque','llave_agua','bebedero','bomba_solar','llave_t','llave_x','distribuidor_t','distribuidor_x'];
+  let net='elec';
   if(wt.includes(a.type)||wt.includes(b.type))net='agua';
   if(a.type==='potrero'||b.type==='potrero')net='both';
-  // Validar duplicado
-  var existe=S.conns.some(function(c){
-    return (c.from===connFirst&&c.to===id)||(c.from===id&&c.to===connFirst);
-  });
-  if(existe){
-    showToast('⚠️','Ya conectados','"'+a.name+'" y "'+b.name+'" ya tienen una conexión.');
-  } else {
-    S.conns.push({id:uid(),from:connFirst,to:id,net:net});
-    addHist('Config','Conectó "'+a.name+'" ↔ "'+b.name+'"','Red: '+net);
-    showToast('🔗','Conexión creada','"'+a.name+'" ↔ "'+b.name+'" ['+net+']');
+  if(!S.conns.find(c=>(c.from===connFirst&&c.to===id)||(c.from===id&&c.to===connFirst))){
+    S.conns.push({id:uid(),from:connFirst,to:id,net});
+    addHist('Config',`Conectó "${a.name}" ↔ "${b.name}"`,`Red: ${net}`);
   }
-  connFirst=null;
-  setBanner('Modo conexión — tocá el siguiente par · Doble toque en mapa vacío para salir');
-  renderAll();renderCfg();save();
+  connFirst=null;setBanner('Modo conexión — tocá el primer elemento');renderAll();renderCfg();save();
 }
 
 // ── DRAW ───────────────────────────────────────────────────
@@ -1492,6 +1557,7 @@ function startDraw(){
 
 function cancelDraw(){
   drawMode=false;drawPts=[];
+  if(typeof editPolyId!=='undefined'&&editPolyId)cancelEditPoly();
   drawLines.forEach(l=>map.removeLayer(l));drawLines=[];
   if(drawPrev){map.removeLayer(drawPrev);drawPrev=null;}
   document.getElementById('btn-draw').textContent='✏️ Dibujar';
@@ -1986,9 +2052,9 @@ function renderRed(){
 
 
 window.addEventListener('DOMContentLoaded', function(){
-  osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22,maxNativeZoom:19,attribution:'© OSM'});
-  sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:22,maxNativeZoom:19,attribution:'© Esri'});
-  map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false,maxZoom:22});
+  osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
+  sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
+  map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
   map.setView([-31.4,-55.42],13);
   baseL=L.layerGroup().addTo(map);
   elemL=L.layerGroup().addTo(map);
