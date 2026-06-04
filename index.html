@@ -273,7 +273,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v58</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v60.0 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -690,6 +690,15 @@ body{display:flex;flex-direction:column}
   crossorigin="anonymous"></script>
 
 <script>
+// ── BUILD INFO ─────────────────────────────────────────────
+// Editá BUILD_NOTE antes de subir a git (dejalo vacío para no mostrar nada)
+// Ejemplo: var BUILD_NOTE = "hotfix llave-B12";
+var BUILD_NOTE = "";
+// También actualizá el número de versión en:
+//   1. <div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · vNN</div>
+//   2. sw.js -> FALLBACK_CACHE = 'mhe-vNN'
+// ───────────────────────────────────────────────────────────
+
 // ── VARIABLES GLOBALES DEL MAPA ────────────────────────────
 var osm, sat, map, baseL, elemL, satOn=false;
 function togLayer(){if(!map)return;satOn=!satOn;satOn?(map.addLayer(sat),map.removeLayer(osm)):(map.addLayer(osm),map.removeLayer(sat));var b=document.getElementById('btn-sat');if(b)b.classList.toggle('active',satOn);}
@@ -727,7 +736,6 @@ var gpsWatchId=null,gpsMarker=null,gpsCircle=null;
 var connMode=false,connFirst=null;
 var addMode=false,moveMode=false,moveId=null;
 var drawMode=false,drawPts=[],drawLines=[],drawPrev=null;
-var editPolyId=null,editPolyMarkers=[],editPolyLine=null;
 var pendingGeom=null,pendingFeats=[],featIdx=0;
 var togPending=null;
 var renameCb=null;
@@ -1219,21 +1227,14 @@ function renderCfg(){
   const el=document.getElementById('cfg-el');
   const items=Object.values(S.elems).sort((a,b)=>a.name.localeCompare(b.name,'es'));
   if(!items.length){el.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';return;}
-  el.innerHTML=items.map(function(e){
-    var ico=T[e.type]&&T[e.type].ico?T[e.type].ico:'?';
-    var canInsert=JUNC.includes(e.type)||e.type==='llave_agua'||e.type==='llave_elec';
-    var isPoly=e.type==='potrero'&&e.geom&&e.geom.type==='Polygon';
-    var insertBtn=canInsert?'<button onclick="insertExistingInConn(\''+e.id+'\')" title="Insertar en linea" style="background:transparent;border:none;color:var(--cyan);font-size:10px;cursor:pointer;font-family:var(--mono)">🔗</button>':'';
-    var polyBtn=isPoly?'<button onclick="startEditPoly(\''+e.id+'\')" title="Editar vertices" style="background:transparent;border:none;color:var(--amber);font-size:10px;cursor:pointer;font-family:var(--mono)">&#9651;</button>':'';
-    return '<div class="cfg-row">'+
-      '<span style="font-size:13px">'+ico+'</span>'+
-      '<span style="flex:1;font-size:11px">'+e.name+'</span>'+
-      insertBtn+polyBtn+
-      '<button onclick="startMove(\''+e.id+'\')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">📍</button>'+
-      '<button onclick="showEdit(\''+e.id+'\')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">✏️</button>'+
-      '<button onclick="delElem(\''+e.id+'\')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>'+
-    '</div>';
-  }).join('');
+  el.innerHTML=items.map(e=>`
+    <div class="cfg-row">
+      <span style="font-size:13px">${T[e.type]?.ico||'?'}</span>
+      <span style="flex:1;font-size:11px">${e.name}</span>
+      <button onclick="startMove('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">📍</button>
+      <button onclick="showEdit('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">✏️</button>
+      <button onclick="delElem('${e.id}')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>
+    </div>`).join('');
   const cl=document.getElementById('cfg-cl');
   if(!S.conns.length){cl.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin conexiones</div>';return;}
   cl.innerHTML=S.conns.filter(c=>{
@@ -1449,80 +1450,6 @@ function askResetAll(){
       baseL.clearLayers();renderAll();renderCfg();save();
     });
   });
-}
-
-
-// ── EDITAR POLIGONO ────────────────────────────────────────
-function startEditPoly(id){
-  exitAll();
-  var el=S.elems[id];
-  if(!el||!el.geom||el.geom.type!=='Polygon')return;
-  editPolyId=id;
-  editPolyMarkers=[];
-  goTab('mapa',document.querySelector('.tab'));
-  var coords=el.geom.coords.slice();
-  editPolyLine=L.polygon(coords,{color:'#ffb300',weight:2,fillOpacity:0.1,dashArray:'6 3'}).addTo(map);
-  coords.forEach(function(pt,i){
-    var m=L.circleMarker([pt[0],pt[1]],{
-      radius:9,color:'#ffb300',fillColor:'#fff',fillOpacity:1,weight:2
-    }).addTo(map);
-    m._vtxIdx=i;
-    // CRÍTICO: detener propagación en click y mousedown para no activar modales
-    m.on('click',function(ev){L.DomEvent.stopPropagation(ev);});
-    m.on('mousedown',function(ev){
-      L.DomEvent.stopPropagation(ev);
-      map.dragging.disable();
-      var startLL=m.getLatLng();
-      function onMove(me){
-        var ll=me.latlng||me.containerPoint?map.containerPointToLatLng(me.containerPoint):startLL;
-        if(me.latlng)m.setLatLng(me.latlng);
-        var nc=editPolyMarkers.map(function(mk){var l=mk.getLatLng();return[l.lat,l.lng];});
-        editPolyLine.setLatLngs(nc);
-      }
-      function onUp(){
-        map.dragging.enable();
-        map.off('mousemove',onMove);
-        map.off('mouseup',onUp);
-      }
-      map.on('mousemove',onMove);
-      map.on('mouseup',onUp);
-    });
-    editPolyMarkers.push(m);
-  });
-  map.fitBounds(editPolyLine.getBounds(),{padding:[40,40]});
-  // Banner con botones Guardar/Cancelar
-  var b=document.getElementById('banner');
-  b.style.cssText='display:flex;align-items:center;justify-content:space-between;background:#3a2a00;color:#fff;padding:8px 14px;';
-  b.innerHTML='<span>&#9998; Arrastr&#225; los v&#233;rtices</span>';
-  var sg=document.createElement('button');
-  sg.textContent='Guardar';
-  sg.style.cssText='background:var(--green);border:none;color:#fff;border-radius:4px;padding:3px 14px;font-size:12px;cursor:pointer;margin-left:8px;font-weight:700';
-  sg.onclick=finishEditPoly;
-  var sc=document.createElement('button');
-  sc.textContent='Cancelar';
-  sc.style.cssText='background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:3px 10px;font-size:12px;cursor:pointer;margin-left:4px';
-  sc.onclick=cancelEditPoly;
-  b.appendChild(sg);b.appendChild(sc);
-}
-
-function finishEditPoly(){
-  if(!editPolyId||!editPolyMarkers.length)return;
-  var newCoords=editPolyMarkers.map(function(m){var ll=m.getLatLng();return[ll.lat,ll.lng];});
-  var lat=newCoords.reduce(function(s,c){return s+c[0];},0)/newCoords.length;
-  var lng=newCoords.reduce(function(s,c){return s+c[1];},0)/newCoords.length;
-  S.elems[editPolyId].geom={type:'Polygon',coords:newCoords,lat:lat,lng:lng};
-  addHist('Config','Editó polígono "'+S.elems[editPolyId].name+'"',''+newCoords.length+' vértices');
-  cancelEditPoly();
-  renderAll();save();
-  showToast('✅','Polígono guardado','El polígono fue actualizado correctamente.');
-}
-
-function cancelEditPoly(){
-  editPolyMarkers.forEach(function(m){if(map)map.removeLayer(m);});
-  editPolyMarkers=[];
-  if(editPolyLine){map.removeLayer(editPolyLine);editPolyLine=null;}
-  editPolyId=null;
-  setBanner(null);
 }
 
 // ── MODES ──────────────────────────────────────────────────
@@ -2051,6 +1978,7 @@ function renderRed(){
 
 
 window.addEventListener('DOMContentLoaded', function(){
+  var bn=document.getElementById('build-note');if(bn&&BUILD_NOTE)bn.textContent='['+BUILD_NOTE+']';
   osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
   sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
   map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
