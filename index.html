@@ -273,7 +273,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v58</div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v59</div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -958,12 +958,20 @@ function calcStates(){
   var wS=Object.values(S.elems).filter(function(e){return e.type==='tanque'&&e.on;}).map(function(e){return e.id;});
   var energized=bfs(eS,'elec');
   var watered=bfs(wS,'agua');
-  // Potrero con agua si tiene bebedero con agua dentro del polígono
+  // Potrero con agua si tiene bebedero con agua dentro del polígono O cerca del borde
+  var BEB_RADIO=50; // metros — radio para bebederos compartidos en borde
   Object.values(S.elems).forEach(function(pot){
     if(pot.type!=='potrero'||!pot.geom||pot.geom.type!=='Polygon'||watered.has(pot.id))return;
     Object.values(S.elems).forEach(function(b){
       if(b.type!=='bebedero'||!b.geom||b.geom.type==='Polygon'||!watered.has(b.id))return;
-      if(ptInPoly(b.geom.lat,b.geom.lng,pot.geom.coords))watered.add(pot.id);
+      // Dentro del polígono
+      if(ptInPoly(b.geom.lat,b.geom.lng,pot.geom.coords)){watered.add(pot.id);return;}
+      // Cerca del borde del polígono (bebedero compartido entre potreros)
+      var coords=pot.geom.coords;
+      for(var i=0,j=coords.length-1;i<coords.length;j=i++){
+        var d=distPtoSeg(b.geom.lat,b.geom.lng,coords[j][0],coords[j][1],coords[i][0],coords[i][1]);
+        if(d<BEB_RADIO){watered.add(pot.id);return;}
+      }
     });
   });
   return{energized:energized,watered:watered};
@@ -1306,17 +1314,6 @@ function saveElem(){
   const on=document.getElementById('me-on').value==='1';
   const salidas=JUNC.includes(type)?parseInt(document.getElementById('me-sal').value):null;
   if(!name){showToast('⚠️','Nombre requerido','Ingresá un nombre para el elemento.');return;}
-  // Verificar nombre duplicado (ignorar el elemento actual al editar)
-  var nombreDuplicado=Object.values(S.elems).some(function(e){
-    return e.id!==id && e.name.trim().toLowerCase()===name.toLowerCase();
-  });
-  if(nombreDuplicado){
-    showToast('⚠️','Nombre en uso','"'+name+'" ya existe. Usá un nombre diferente.');
-    // Resaltar el campo de nombre
-    var nameInput=document.getElementById('me-name');
-    if(nameInput){nameInput.style.borderColor='var(--red)';nameInput.focus();setTimeout(function(){nameInput.style.borderColor='';},2000);}
-    return;
-  }
   const ex=S.elems[id];const ll=document._ll;
   const dg=pendingGeom?pendingGeom:ll?{type:'Point',lat:ll.lat,lng:ll.lng}:{type:'Point',lat:map.getCenter().lat,lng:map.getCenter().lng};
   let outlets=ex?.outlets||null;
