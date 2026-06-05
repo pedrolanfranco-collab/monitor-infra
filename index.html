@@ -273,7 +273,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v60.0 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v60.1 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -736,7 +736,6 @@ var gpsWatchId=null,gpsMarker=null,gpsCircle=null;
 var connMode=false,connFirst=null;
 var addMode=false,moveMode=false,moveId=null;
 var drawMode=false,drawPts=[],drawLines=[],drawPrev=null;
-var editPolyId=null,editPolyMarkers=[],editPolyLine=null;
 var pendingGeom=null,pendingFeats=[],featIdx=0;
 var togPending=null;
 var renameCb=null;
@@ -905,7 +904,6 @@ function setBanner(msg,bg){
 }
 
 function exitAll(){
-  if(typeof editPolyId!=="undefined"&&editPolyId)cancelEditPoly();
   connMode=false;connFirst=null;
   addMode=false;
   moveMode=false;moveId=null;
@@ -1034,7 +1032,7 @@ function renderAll(){
     let flowing=false,col='#555',weight=1.5,dash='6 4',opacity=.4;
     if(c.net==='agua'){
       flowing=watered.has(c.from)&&watered.has(c.to);
-      col=flowing?'#29b6f6':'#b71c1c';weight=flowing?2.5:1.5;dash=flowing?'none':'8 5';opacity=flowing?.85:.5;
+      col=flowing?'#29b6f6':'#b71c1c';weight=flowing?4:1.5;dash=flowing?'none':'8 5';opacity=flowing?.9:.45;
     } else if(c.net==='elec'){
       flowing=energized.has(c.from)&&energized.has(c.to);
       col=flowing?'#ffd54f':'#5d4037';weight=flowing?2.5:1.5;dash=flowing?'none':'8 5';opacity=flowing?.85:.5;
@@ -1050,7 +1048,7 @@ function renderAll(){
     let fc=ms.c,fo=el.on?0.85:0.25;
     if(el.type==='potrero'){const hE=energized.has(el.id),hW=watered.has(el.id);fc=hE&&hW?'#4caf50':!hE&&!hW?'#ef5350':'#ffb300';fo=0.85;}
     if(el.type==='bebedero'){fc=watered.has(el.id)?'#26c6da':'#ef5350';fo=0.85;}
-    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:'#111',fillColor:fc,weight:1.2,fillOpacity:0.18,opacity:0.7}).addTo(elemL);
+    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:'#666',fillColor:fc,weight:0.8,fillOpacity:0.14,opacity:0.35}).addTo(elemL);
     let m;
     if(el.type==='potrero'){
       const icon=L.divIcon({className:'pot-label',html:`<div class="pot-lbl" style="color:${fc};transform:translate(-50%,-50%)">${el.name}</div>`,iconSize:[0,0],iconAnchor:[0,0]});
@@ -1233,7 +1231,6 @@ function renderCfg(){
     <div class="cfg-row">
       <span style="font-size:13px">${T[e.type]?.ico||'?'}</span>
       <span style="flex:1;font-size:11px">${e.name}</span>
-      ${e.type==='potrero'&&e.geom&&e.geom.type==='Polygon'?`<button onclick="startEditPoly('${e.id}')" title="Editar vértices" style="background:transparent;border:none;color:#ffb300;font-size:10px;cursor:pointer;font-family:var(--mono)">&#9651;</button>`:''}
       <button onclick="startMove('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">📍</button>
       <button onclick="showEdit('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">✏️</button>
       <button onclick="delElem('${e.id}')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>
@@ -1455,60 +1452,6 @@ function askResetAll(){
   });
 }
 
-
-// ── EDITAR POLÍGONO ────────────────────────────────────────
-function startEditPoly(id){
-  exitAll();
-  var el=S.elems[id];
-  if(!el||!el.geom||el.geom.type!=='Polygon')return;
-  editPolyId=id;editPolyMarkers=[];
-  goTab('mapa',document.querySelector('.tab'));
-  var coords=el.geom.coords.slice();
-  editPolyLine=L.polygon(coords,{color:'#ffb300',weight:2,fillOpacity:0.1,dashArray:'6 3'}).addTo(map);
-  coords.forEach(function(pt){
-    var mk=L.circleMarker([pt[0],pt[1]],{radius:9,color:'#ffb300',fillColor:'#fff',fillOpacity:1,weight:2}).addTo(map);
-    mk.on('click',function(ev){L.DomEvent.stopPropagation(ev);});
-    mk.on('mousedown',function(ev){
-      L.DomEvent.stopPropagation(ev);
-      map.dragging.disable();
-      function onMove(me){
-        if(!me.latlng)return;
-        mk.setLatLng(me.latlng);
-        editPolyLine.setLatLngs(editPolyMarkers.map(function(m){var l=m.getLatLng();return[l.lat,l.lng];}));
-      }
-      function onUp(){map.dragging.enable();map.off('mousemove',onMove);map.off('mouseup',onUp);}
-      map.on('mousemove',onMove);map.on('mouseup',onUp);
-    });
-    editPolyMarkers.push(mk);
-  });
-  map.fitBounds(editPolyLine.getBounds(),{padding:[40,40]});
-  var b=document.getElementById('banner');
-  b.style.cssText='display:flex;align-items:center;justify-content:space-between;background:#3a2a00;color:#fff;padding:8px 14px;';
-  b.innerHTML='<span>&#9998; Arrastr&#225; los v&#233;rtices del pol&#237;gono</span>';
-  var sg=document.createElement('button');
-  sg.textContent='Guardar';sg.style.cssText='background:#2e7d32;border:none;color:#fff;border-radius:4px;padding:3px 14px;font-size:12px;cursor:pointer;margin-left:8px;font-weight:700';
-  sg.onclick=finishEditPoly;
-  var sc=document.createElement('button');
-  sc.textContent='Cancelar';sc.style.cssText='background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:3px 10px;font-size:12px;cursor:pointer;margin-left:4px';
-  sc.onclick=cancelEditPoly;
-  b.appendChild(sg);b.appendChild(sc);
-}
-function finishEditPoly(){
-  if(!editPolyId||!editPolyMarkers.length)return;
-  var nc=editPolyMarkers.map(function(mk){var l=mk.getLatLng();return[l.lat,l.lng];});
-  var lat=nc.reduce(function(s,p){return s+p[0];},0)/nc.length;
-  var lng=nc.reduce(function(s,p){return s+p[1];},0)/nc.length;
-  S.elems[editPolyId].geom={type:'Polygon',coords:nc,lat:lat,lng:lng};
-  addHist('Config','Editó polígono "'+S.elems[editPolyId].name+'"','');
-  cancelEditPoly();renderAll();save();
-  showToast('✅','Polígono guardado','Vértices actualizados correctamente.');
-}
-function cancelEditPoly(){
-  editPolyMarkers.forEach(function(mk){try{map.removeLayer(mk);}catch(e){}});
-  editPolyMarkers=[];
-  if(editPolyLine){try{map.removeLayer(editPolyLine);}catch(e){}editPolyLine=null;}
-  editPolyId=null;setBanner(null);
-}
 // ── MODES ──────────────────────────────────────────────────
 function startAddMode(){exitAll();addMode=true;setBanner('📍 Tocá el mapa donde agregar el elemento','#1a6b2a');goTab('mapa',document.querySelector('.tab'));}
 function startMove(id){exitAll();moveMode=true;moveId=id;setBanner(`📍 Tocá la nueva ubicación de "${S.elems[id]?.name}"`, '#1a3a6b');goTab('mapa',document.querySelector('.tab'));}
