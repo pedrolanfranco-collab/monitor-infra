@@ -161,9 +161,16 @@ body{display:flex;flex-direction:column}
 .gi-close{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--txt2);cursor:pointer;font-size:14px;line-height:1}
 
 /* LEGEND */
-#legend{position:absolute;bottom:10px;right:10px;z-index:500;background:rgba(11,26,13,.9);border:1px solid var(--brd2);border-radius:6px;padding:8px;min-width:130px;font-size:10px;backdrop-filter:blur(4px)}
-.lr{display:flex;align-items:center;gap:6px;padding:1px 0;font-family:var(--cond);color:var(--txt2);font-size:10px}
-.ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+#legend{position:absolute;bottom:10px;right:10px;z-index:500;background:rgba(11,26,13,.92);border:1px solid var(--brd2);border-radius:6px;font-size:9px;backdrop-filter:blur(4px);max-width:118px;touch-action:none;user-select:none;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+#legend-hdr{display:flex;align-items:center;gap:4px;padding:5px 7px;cursor:move;font-family:var(--cond);font-size:9px;font-weight:700;color:var(--green2);letter-spacing:.3px;white-space:nowrap}
+#legend-hdr .lg-grip{opacity:.5;font-size:9px;letter-spacing:-1px}
+#legend-hdr .lg-arrow{margin-left:auto;opacity:.7;font-size:8px}
+#legend.collapsed{max-width:none}
+#legend.collapsed #legend-body{display:none}
+#legend.collapsed #legend-hdr{padding:5px 7px}
+#legend-body{padding:0 7px 6px}
+.lr{display:flex;align-items:center;gap:5px;padding:.5px 0;font-family:var(--cond);color:var(--txt2);font-size:9px}
+.ld{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 
 /* ELEMENT PICKER */
 #m-pick{display:none;position:absolute;z-index:800;background:var(--surf);border:1px solid var(--brd2);border-radius:10px;min-width:200px;max-width:260px;box-shadow:0 12px 40px rgba(0,0,0,.7);overflow:hidden}
@@ -284,7 +291,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v60.5 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v60.6 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -309,6 +316,8 @@ body{display:flex;flex-direction:column}
     <button class="map-btn" id="btn-gps" onclick="togGPS()">📍 Mi ubicación</button>
     <div id="gps-info"></div>
     <div id="legend">
+      <div id="legend-hdr" onpointerdown="legendDragStart(event)"><span class="lg-grip">⠿</span> Referencias <span class="lg-arrow" id="legend-arrow">▾</span></div>
+      <div id="legend-body">
       <div class="lr"><div class="ld" style="background:#4caf50"></div>Potrero OK</div>
       <div class="lr"><div class="ld" style="background:#ef5350"></div>Sin servicio</div>
       <div class="lr"><div class="ld" style="background:#ffb300"></div>Parcial/Eléc</div>
@@ -324,6 +333,7 @@ body{display:flex;flex-direction:column}
       <div class="lr"><div style="width:18px;height:2px;background:#b71c1c;border-radius:1px;border-top:1px dashed #b71c1c"></div>Agua cortada</div>
       <div class="lr"><div style="width:18px;height:3px;background:#ffd54f;border-radius:1px"></div>Eléc activo</div>
       <div class="lr"><div style="width:18px;height:2px;background:#5d4037;border-radius:1px;border-top:1px dashed #5d4037"></div>Eléc cortado</div>
+      </div>
     </div>
   </div>
 
@@ -1842,6 +1852,62 @@ function renameOutlet(id,idx){
   });
 }
 
+// ── LEYENDA: colapsable y arrastrable ─────────────────────
+var LEGEND_KEY='mhe_legend_ui';
+function initLegend(){
+  const el=document.getElementById('legend');if(!el)return;
+  var st={};
+  try{st=JSON.parse(localStorage.getItem(LEGEND_KEY))||{};}catch(e){}
+  if(st.collapsed===undefined)st.collapsed=true; // por defecto chica
+  el.classList.toggle('collapsed',!!st.collapsed);
+  if(st.left!=null&&st.top!=null){
+    el.style.left=st.left+'px';el.style.top=st.top+'px';
+    el.style.right='auto';el.style.bottom='auto';
+  }
+  updateLegendArrow();
+}
+function saveLegendUI(){
+  const el=document.getElementById('legend');if(!el)return;
+  var st={collapsed:el.classList.contains('collapsed')};
+  if(el.style.left)st.left=parseFloat(el.style.left);
+  if(el.style.top)st.top=parseFloat(el.style.top);
+  localStorage.setItem(LEGEND_KEY,JSON.stringify(st));
+}
+function toggleLegend(){
+  document.getElementById('legend').classList.toggle('collapsed');
+  updateLegendArrow();saveLegendUI();
+}
+function updateLegendArrow(){
+  const collapsed=document.getElementById('legend').classList.contains('collapsed');
+  const a=document.getElementById('legend-arrow');if(a)a.textContent=collapsed?'▸':'▾';
+}
+function legendDragStart(e){
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  e.preventDefault();
+  const el=document.getElementById('legend');
+  const wrap=el.parentElement;
+  const startX=e.clientX,startY=e.clientY;
+  const startLeft=el.offsetLeft,startTop=el.offsetTop;
+  el.style.left=startLeft+'px';el.style.top=startTop+'px';
+  el.style.right='auto';el.style.bottom='auto';
+  var moved=false;
+  function move(ev){
+    const dx=ev.clientX-startX,dy=ev.clientY-startY;
+    if(Math.abs(dx)>4||Math.abs(dy)>4)moved=true;
+    var nl=startLeft+dx,nt=startTop+dy;
+    nl=Math.max(0,Math.min(nl,wrap.clientWidth-el.offsetWidth));
+    nt=Math.max(0,Math.min(nt,wrap.clientHeight-el.offsetHeight));
+    el.style.left=nl+'px';el.style.top=nt+'px';
+  }
+  function up(){
+    document.removeEventListener('pointermove',move);
+    document.removeEventListener('pointerup',up);
+    if(!moved)toggleLegend();else saveLegendUI();
+  }
+  document.addEventListener('pointermove',move);
+  document.addEventListener('pointerup',up);
+}
+
 // ── GPS ────────────────────────────────────────────────────
 function togGPS(){
   const b=document.getElementById('btn-gps');
@@ -2324,6 +2390,7 @@ setTimeout(()=>{
     if(b.isValid())map.fitBounds(b,{padding:[40,40]});
   }
 },300);
+initLegend();
 });
 </script>
 
