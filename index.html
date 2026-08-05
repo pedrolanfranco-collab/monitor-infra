@@ -216,6 +216,17 @@ body{display:flex;flex-direction:column}
 .sim li{margin-bottom:2px}
 .feat-inf{background:var(--surf2);border:1px solid var(--brd);border-radius:4px;padding:5px 9px;margin-bottom:8px;font-family:var(--mono);font-size:10px;color:var(--txt2)}
 
+/* RESULT REPORT MODAL */
+.mbox.wide{max-width:400px}
+#mr-body{max-height:52vh;overflow-y:auto;margin-bottom:4px}
+.mr-grp{margin-bottom:10px}
+.mr-h{font-family:var(--mono);font-size:10px;letter-spacing:.5px;padding:6px 9px;border-radius:5px 5px 0 0;font-weight:700}
+.mr-h.ok{background:rgba(76,175,80,.14);color:var(--green2);border:1px solid rgba(76,175,80,.3);border-bottom:none}
+.mr-h.bad{background:rgba(239,83,80,.1);color:var(--red);border:1px solid rgba(239,83,80,.28);border-bottom:none}
+.mr-list{border:1px solid var(--brd);border-top:none;border-radius:0 0 5px 5px;padding:4px 0;max-height:160px;overflow-y:auto}
+.mr-item{font-size:12px;color:var(--txt);padding:4px 11px}
+.mr-item.mr-none{color:var(--txt3);font-style:italic}
+
 /* TOAST */
 .toast-ico{font-size:28px;text-align:center;margin-bottom:8px}
 .toast-body{text-align:center}
@@ -273,7 +284,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v60.1 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v60.5 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -387,7 +398,9 @@ body{display:flex;flex-direction:column}
 
     <!-- POTREROS -->
     <div class="pv" id="pv-potreros">
-      <div class="ph">ESTADO POR POTRERO</div>
+      <div class="ph">ESTADO POR POTRERO
+        <button onclick="startDraw();goTab('mapa',document.querySelector('.tab'))" style="background:rgba(76,175,80,.2);border:1px solid rgba(76,175,80,.4);color:var(--green2);border-radius:4px;padding:2px 8px;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0">➕ Nuevo</button>
+      </div>
       <div class="scroll" id="pot-list"><div class="es"><div class="bi">🌿</div>Sin potreros.</div></div>
     </div>
 
@@ -484,7 +497,11 @@ body{display:flex;flex-direction:column}
   <div class="mbox">
     <h2 id="me-title">NUEVO ELEMENTO</h2>
     <input type="hidden" id="me-id">
-    <label>Nombre</label><input id="me-name" type="text" placeholder="Ej: Llave Norte">
+    <label>Nombre</label>
+    <div style="display:flex;gap:4px;align-items:center">
+      <input id="me-name" type="text" placeholder="Ej: Llave Norte" style="flex:1">
+      <button onclick="document.getElementById('me-name').value='';document.getElementById('me-name').focus();" title="Borrar nombre" style="background:var(--surf2);border:1px solid var(--brd2);color:var(--txt2);border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0">✕</button>
+    </div>
     <label>Tipo</label>
     <select id="me-type" onchange="onType()">
       <optgroup label="─ Eléctrico ─">
@@ -525,11 +542,14 @@ body{display:flex;flex-direction:column}
       </select>
       <div id="me-sal-preview" style="margin-top:6px;font-size:10px;color:var(--txt2);font-family:var(--mono)"></div>
     </div>
+    <label>Cota (m.s.n.m.) <span style="font-size:9px;color:var(--txt3)">— opcional</span></label>
+    <input id="me-cota" type="number" step="0.5" min="0" max="9999" placeholder="Ej: 85 (altura sobre el nivel del mar)">
     <label>Estado</label>
     <select id="me-on"><option value="1">Activo / Abierta</option><option value="0">Inactivo / Cerrada</option></select>
     <div class="mac">
       <button class="m-cn" onclick="closeM('m-elem')">Cancelar</button>
       <button class="m-dn" id="me-del" style="display:none" onclick="delFromModal()">🗑</button>
+      <button title="Limpiar formulario" onclick="resetElemForm()" style="background:var(--surf2);border:1px solid var(--brd2);color:var(--txt2);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:11px;font-family:var(--cond)">↺ Limpiar</button>
       <button class="m-ok" onclick="saveElem()">Guardar</button>
     </div>
   </div>
@@ -545,6 +565,17 @@ body{display:flex;flex-direction:column}
     <div class="mac">
       <button class="m-cn" onclick="closeM('m-tog')">Cancelar</button>
       <button class="m-ok" onclick="confirmTog()">✔ Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Resultado de operación (quién queda con/sin agua o energía) -->
+<div class="modal" id="m-result">
+  <div class="mbox wide">
+    <h2 id="mr-title">RESULTADO</h2>
+    <div id="mr-body"></div>
+    <div class="mac">
+      <button class="m-ok" onclick="closeM('m-result')" style="flex:1">✔ Entendido</button>
     </div>
   </div>
 </div>
@@ -736,6 +767,7 @@ var gpsWatchId=null,gpsMarker=null,gpsCircle=null;
 var connMode=false,connFirst=null;
 var addMode=false,moveMode=false,moveId=null;
 var drawMode=false,drawPts=[],drawLines=[],drawPrev=null;
+var editPotMode=false,editPotId=null,editPotLayer=null,editPotPoly=null,editPotMarkers=[],editPotMidMarkers=[],editPotOrigCoords=null;
 var pendingGeom=null,pendingFeats=[],featIdx=0;
 var togPending=null;
 var renameCb=null;
@@ -897,9 +929,15 @@ function setBanner(msg,bg){
   var b=document.getElementById('banner');
   if(!msg){b.style.display='none';b.innerHTML='';return;}
   b.style.cssText='display:flex;align-items:center;justify-content:space-between;background:'+bg+';color:'+((bg.indexOf('6b')>=0||bg.indexOf('1a6')>=0)?'#c8e6c9':'#fff')+';padding:8px 14px;';
-  var showExit=connMode||addMode||moveMode||drawMode;
   var exitBtn='';
-  if(showExit)exitBtn='<button onclick="exitAll();setBanner(null);" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:2px 10px;font-size:12px;cursor:pointer;margin-left:8px;font-weight:700">X SALIR</button>';
+  if(editPotMode){
+    exitBtn='<div style="display:flex;gap:6px">'
+      +'<button onclick="saveEditPot()" style="background:rgba(76,175,80,.3);border:1px solid rgba(76,175,80,.6);color:#c8e6c9;border-radius:4px;padding:2px 10px;font-size:12px;cursor:pointer;font-weight:700">💾 Guardar</button>'
+      +'<button onclick="cancelEditPot()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:2px 10px;font-size:12px;cursor:pointer;font-weight:700">✕ Cancelar</button>'
+      +'</div>';
+  } else if(connMode||addMode||moveMode||drawMode){
+    exitBtn='<button onclick="exitAll();setBanner(null);" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:2px 10px;font-size:12px;cursor:pointer;margin-left:8px;font-weight:700">X SALIR</button>';
+  }
   b.innerHTML='<span>'+msg+'</span>'+exitBtn;
 }
 
@@ -908,6 +946,7 @@ function exitAll(){
   addMode=false;
   moveMode=false;moveId=null;
   if(drawMode)cancelDraw();
+  if(editPotMode)cancelEditPot();
   setBanner(null);
 }
 
@@ -943,6 +982,13 @@ function calcStates(){
       if(outletMap[b.id][c.from]===undefined){const uc=Object.keys(outletMap[b.id]).length;outletMap[b.id][c.from]=Math.min(uc,b.outlets.length-1);}
     }
   });
+  // Cota máxima activa: agua no puede subir más alto que el tanque activo más elevado
+  var maxTankCota=null;
+  Object.values(S.elems).forEach(function(e){
+    if(e.type==='tanque'&&e.on&&e.cota!=null){
+      if(maxTankCota===null||e.cota>maxTankCota)maxTankCota=e.cota;
+    }
+  });
   function bfs(srcs,net){
     var reached=new Set(srcs);var q=srcs.slice();
     while(q.length){
@@ -951,8 +997,13 @@ function calcStates(){
         if(e.net!==net&&e.net!=='both')return;
         if(reached.has(e.to))return;
         var el=S.elems[e.to];if(!el)return;
+        // Desnivel: si el elemento está más alto que el tanque activo más elevado, no llega el agua
+        if(net==='agua'&&maxTankCota!==null&&el.cota!=null&&el.cota>maxTankCota)return;
         var isPassThrough=JUNC.includes(el.type)&&(!el.outlets||el.outlets.length===0);
-        if(!isPassThrough&&T[el.type]&&T[el.type].valve&&!el.on)return;
+        if(!isPassThrough&&T[el.type]&&T[el.type].valve&&!el.on){
+          reached.add(e.to); // agua llega hasta la llave cerrada pero no pasa
+          return;
+        }
         var curEl=S.elems[cur];
         if(curEl&&JUNC.includes(curEl.type)&&curEl.outlets&&curEl.outlets.length>0&&outletMap[cur]){
           var oi=outletMap[cur][e.to];
@@ -1009,12 +1060,37 @@ function askTog(id){
 function confirmTog(){
   if(!togPending)return;
   const el=S.elems[togPending];
+  const ti=T[el.type];const isSrc=ti?.src;
   const was=el.on;el.on=!was;
   addHist('Op',`${was?'Cerró':'Abrió'} "${el.name}"`);
   // Vibración háptica al confirmar operación
   vibrate(was?[40,20,40]:80);
   closeM('m-tog');togPending=null;
   renderAll();save();
+  const act=was?(isSrc?'🔴 APAGADA':'🔒 CERRADA'):(isSrc?'🟢 ENCENDIDA':'🔓 ABIERTA');
+  showResultReport(`${act}: ${el.name.toUpperCase()}`,ti.net);
+}
+
+// ── REPORTE DE ESTADO (quién queda con/sin agua o energía) ──
+function buildStateReport(net){
+  const{energized,watered}=calcStates();
+  const ok=net==='agua'?watered:energized;
+  const targets=Object.values(S.elems).filter(e=>e.type==='potrero'||(e.type==='bebedero'&&net==='agua'));
+  const con=[],sin=[];
+  targets.forEach(e=>(ok.has(e.id)?con:sin).push(e));
+  const byName=(a,b)=>a.name.localeCompare(b.name,'es');
+  con.sort(byName);sin.sort(byName);
+  return{con,sin};
+}
+function showResultReport(title,net){
+  const{con,sin}=buildStateReport(net);
+  const lbl=net==='agua'?'AGUA':'ENERGÍA';
+  const mk=list=>list.length?list.map(e=>`<div class="mr-item">${T[e.type].ico} ${e.name}</div>`).join(''):'<div class="mr-item mr-none">— ninguno —</div>';
+  document.getElementById('mr-title').textContent=title;
+  document.getElementById('mr-body').innerHTML=
+    `<div class="mr-grp"><div class="mr-h ok">✅ CON ${lbl} (${con.length})</div><div class="mr-list">${mk(con)}</div></div>`+
+    `<div class="mr-grp"><div class="mr-h bad">❌ SIN ${lbl} (${sin.length})</div><div class="mr-list">${mk(sin)}</div></div>`;
+  document.getElementById('m-result').classList.add('on');
 }
 
 // ── RENDER MAP ─────────────────────────────────────────────
@@ -1032,7 +1108,7 @@ function renderAll(){
     let flowing=false,col='#555',weight=1.5,dash='6 4',opacity=.4;
     if(c.net==='agua'){
       flowing=watered.has(c.from)&&watered.has(c.to);
-      col=flowing?'#29b6f6':'#b71c1c';weight=flowing?4:1.5;dash=flowing?'none':'8 5';opacity=flowing?.9:.45;
+      col=flowing?'#29b6f6':'#b71c1c';weight=flowing?2.5:1.5;dash=flowing?'none':'8 5';opacity=flowing?.85:.5;
     } else if(c.net==='elec'){
       flowing=energized.has(c.from)&&energized.has(c.to);
       col=flowing?'#ffd54f':'#5d4037';weight=flowing?2.5:1.5;dash=flowing?'none':'8 5';opacity=flowing?.85:.5;
@@ -1047,8 +1123,10 @@ function renderAll(){
     const ms=MS[el.type]||{r:7,c:'#888'};
     let fc=ms.c,fo=el.on?0.85:0.25;
     if(el.type==='potrero'){const hE=energized.has(el.id),hW=watered.has(el.id);fc=hE&&hW?'#4caf50':!hE&&!hW?'#ef5350':'#ffb300';fo=0.85;}
+    // Válvula de agua cerrada pero con presión: semitransparente + tooltip especial
+    if(!el.on&&watered.has(el.id)&&ti&&ti.net==='agua'){fo=0.55;}
     if(el.type==='bebedero'){fc=watered.has(el.id)?'#26c6da':'#ef5350';fo=0.85;}
-    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:'#666',fillColor:fc,weight:0.8,fillOpacity:0.14,opacity:0.35}).addTo(elemL);
+    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:'#111',fillColor:fc,weight:1.2,fillOpacity:0.18,opacity:0.7}).addTo(elemL);
     let m;
     if(el.type==='potrero'){
       const icon=L.divIcon({className:'pot-label',html:`<div class="pot-lbl" style="color:${fc};transform:translate(-50%,-50%)">${el.name}</div>`,iconSize:[0,0],iconAnchor:[0,0]});
@@ -1057,7 +1135,9 @@ function renderAll(){
       m=L.circleMarker([el.geom.lat,el.geom.lng],{radius:ms.r,color:fc,fillColor:fc,weight:2,fillOpacity:fo});
       const vs=ti.valve?(el.on?' [ABIERTA]':' [CERRADA]'):'';
       const ss=el.salidas?` · ${el.salidas} sal`:'';
-      m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}`,{direction:'top',offset:[0,-8]});
+      const llegando=(!el.on&&watered.has(el.id)&&ti.net==='agua')?' 💧llegando':'';
+      const ctip=el.cota!=null?` · ${el.cota}m`:''; 
+      m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}${llegando}${ctip}`,{direction:'top',offset:[0,-8]});
     }
     m.on('click',function(ev){if(connMode){L.DomEvent.stopPropagation(ev);handleConn(el.id);return;}if(JUNC.includes(el.type)&&el.outlets&&el.outlets.length>0)showJunc(el.id);else if(ti&&ti.valve)askTog(el.id);});
     m.addTo(elemL);
@@ -1200,8 +1280,16 @@ function renderPot(){
   d.innerHTML=pts.map(p=>{
     const hE=energized.has(p.id),hW=watered.has(p.id),av=hE&&hW;
     const bc=av?'rgba(76,175,80,.3)':!hE&&!hW?'rgba(239,83,80,.3)':'rgba(255,179,0,.3)';
+    const hasPoly=p.geom&&p.geom.type==='Polygon';
     return `<div class="pc" style="border-color:${bc}">
-      <div class="pc-top"><span class="pc-n">🌿 ${p.name}</span><span class="pc-b ${av?'pa':'pna'}">${av?'DISPONIBLE':'NO DISP.'}</span></div>
+      <div class="pc-top">
+        <span class="pc-n">🌿 ${p.name}</span>
+        <div style="display:flex;gap:4px;align-items:center">
+          <span class="pc-b ${av?'pa':'pna'}">${av?'DISPONIBLE':'NO DISP.'}</span>
+          <button onclick="locateElem('${p.id}')" title="Ver en mapa" style="background:transparent;border:1px solid var(--brd2);color:var(--txt2);border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer">📍</button>
+          ${hasPoly?`<button onclick="startEditPot('${p.id}')" title="Editar v\u00e9rtices" style="background:transparent;border:1px solid var(--brd2);color:var(--txt2);border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer">✏️</button>`:''}
+        </div>
+      </div>
       <div class="pc-pills">
         <span class="pill ${hE?'pk':'pn'}">⚡ ${hE?'ENERGIZADO':'SIN ENERGÍA'}</span>
         <span class="pill ${hW?'pk':'pn'}">💧 ${hW?'CON AGUA':'SIN AGUA'}</span>
@@ -1253,6 +1341,23 @@ function renderCfg(){
 }
 
 // ── ELEMENT CRUD ───────────────────────────────────────────
+function resetElemForm(){
+  // Solo limpia si es elemento nuevo (me-id vacío)
+  var isNew=!document.getElementById('me-id').value;
+  document.getElementById('me-name').value='';
+  document.getElementById('me-name').style.borderColor='';
+  document.getElementById('me-name').focus();
+  if(isNew){
+    // Al crear nuevo: también resetear tipo, sistema y estado a valores por defecto
+    document.getElementById('me-type').value='llave_agua';
+    document.getElementById('me-sist').value='1';
+    document.getElementById('me-on').value='1';
+    document.getElementById('me-sal').value='2';
+    onType();
+  }
+  showToast('↺','Formulario limpiado','Podés ingresar los nuevos datos.');
+}
+
 function onType(){
   var t=document.getElementById('me-type').value;
   document.getElementById('me-sist-row').style.display=SIST_T.includes(t)?'block':'none';
@@ -1286,6 +1391,7 @@ function showAdd(ll){
   document.getElementById('me-id').value='';document.getElementById('me-name').value='';
   document.getElementById('me-type').value='llave_agua';document.getElementById('me-sist').value='1';
   document.getElementById('me-on').value='1';document.getElementById('me-del').style.display='none';
+  document.getElementById('me-cota').value='';
   document._ll=ll;pendingGeom=null;onType();document.getElementById('m-elem').classList.add('on');
 }
 
@@ -1297,6 +1403,7 @@ function showEdit(id){
   document.getElementById('me-type').value=el.type;
   document.getElementById('me-sist').value=el.sistema||1;
   document.getElementById('me-on').value=el.on?'1':'0';
+  document.getElementById('me-cota').value=(el.cota!=null)?el.cota:'';
   // Cargar cantidad de salidas actual (puede ser 0,1,2,3,4)
   if(JUNC.includes(el.type)){
     var nSal=el.outlets?el.outlets.length:(el.salidas||2);
@@ -1340,7 +1447,9 @@ function saveElem(){
     }
   }
   const isNew=!ex;
-  S.elems[id]={id,type,name,sistema:sist,on,salidas,outlets,geom:ex?.geom||dg,fromKMZ:ex?.fromKMZ||false};
+  const cotaVal=parseFloat(document.getElementById('me-cota').value);
+  const cota=isNaN(cotaVal)?null:cotaVal;
+  S.elems[id]={id,type,name,sistema:sist,on,salidas,outlets,cota,geom:ex?.geom||dg,fromKMZ:ex?.fromKMZ||false};
   pendingGeom=null;document._ll=null;closeM('m-elem');
   // Auto-insertar en conexión existente si es T/Cruz nueva colocada en el mapa
   var canAutoInsert=JUNC.includes(type)||type==='llave_agua'||type==='llave_elec';
@@ -1504,7 +1613,126 @@ function finishDraw(){
   document._ll=null;onType();document.getElementById('m-elem').classList.add('on');
 }
 
-// ── ELEMENT PICKER (múltiples solapados) ───────────────────
+// ── EDIT POTRERO VERTICES ───────────────────────────────────────────
+function startEditPot(id){
+  var el=S.elems[id];
+  if(!el||el.type!=='potrero'||!el.geom||el.geom.type!=='Polygon'){
+    showToast('⚠️','Sin polígono','Este potrero no tiene un polígono dibujado. Usá el botón ➕ Nuevo para dibujarlo.');return;
+  }
+  exitAll();
+  editPotMode=true;editPotId=id;
+  editPotOrigCoords=el.geom.coords.map(function(c){return c.slice();});
+  document.querySelectorAll('.pv').forEach(function(p){p.classList.remove('on');});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('pv-mapa').classList.add('on');
+  document.querySelector('.tab').classList.add('active');
+  try{var bnd=L.polygon(el.geom.coords).getBounds();if(bnd.isValid())map.fitBounds(bnd,{padding:[60,60]});}catch(e){}
+  editPotLayer=L.layerGroup().addTo(map);
+  buildEditPotMarkers();
+  setBanner('✏️ Editando "'+el.name+'" — arrastrá vértices · tocá entre puntos para agregar · doble clic en vértice para borrar','#1a2a6b');
+}
+
+function buildEditPotMarkers(){
+  var el=S.elems[editPotId];
+  var pts=el.geom.coords.slice();
+  if(pts.length>1){var f=pts[0],la=pts[pts.length-1];if(f[0]===la[0]&&f[1]===la[1])pts=pts.slice(0,-1);}
+  editPotLayer.clearLayers();
+  editPotMarkers=[];editPotMidMarkers=[];
+  editPotPoly=L.polygon(pts,{color:'#fff',weight:2,fillColor:'#4caf50',fillOpacity:0.15,dashArray:'6 4'}).addTo(editPotLayer);
+  pts.forEach(function(pt,i){
+    var m=L.marker([pt[0],pt[1]],{
+      draggable:true,
+      icon:L.divIcon({
+        className:'',
+        html:'<div style="width:16px;height:16px;border-radius:50%;background:#fff;border:2.5px solid #4caf50;box-shadow:0 2px 6px rgba(0,0,0,.7);margin-top:-8px;margin-left:-8px;cursor:grab"></div>',
+        iconSize:[0,0],iconAnchor:[0,0]
+      }),
+      zIndexOffset:200
+    });
+    m._epIdx=i;
+    m.on('drag',function(){updateEditPolyPreview();});
+    m.on('dragend',function(){updateEditPolyPreview();updateEditMidMarkers();});
+    m.on('dblclick',function(ev){L.DomEvent.stopPropagation(ev);removeEditVertex(this._epIdx);});
+    m.addTo(editPotLayer);
+    editPotMarkers.push(m);
+  });
+  updateEditMidMarkers();
+}
+
+function getEditPotCoords(){
+  return editPotMarkers.map(function(m){var ll=m.getLatLng();return[ll.lat,ll.lng];});
+}
+
+function updateEditPolyPreview(){
+  if(editPotPoly)editPotPoly.setLatLngs(getEditPotCoords());
+}
+
+function updateEditMidMarkers(){
+  editPotMidMarkers.forEach(function(m){editPotLayer.removeLayer(m);});
+  editPotMidMarkers=[];
+  var n=editPotMarkers.length;
+  for(var i=0;i<n;i++){
+    (function(afterIdx){
+      var a=editPotMarkers[afterIdx].getLatLng();
+      var b=editPotMarkers[(afterIdx+1)%n].getLatLng();
+      var midLat=(a.lat+b.lat)/2,midLng=(a.lng+b.lng)/2;
+      var mid=L.marker([midLat,midLng],{
+        icon:L.divIcon({
+          className:'',
+          html:'<div style="width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.55);border:1.5px solid #81c784;box-shadow:0 1px 3px rgba(0,0,0,.5);margin-top:-5px;margin-left:-5px;cursor:pointer"></div>',
+          iconSize:[0,0],iconAnchor:[0,0]
+        }),
+        zIndexOffset:100
+      });
+      mid.on('click',function(ev){L.DomEvent.stopPropagation(ev);insertEditVertex(afterIdx,this.getLatLng());});
+      mid.addTo(editPotLayer);
+      editPotMidMarkers.push(mid);
+    })(i);
+  }
+}
+
+function insertEditVertex(afterIdx,latlng){
+  var coords=getEditPotCoords();
+  coords.splice(afterIdx+1,0,[latlng.lat,latlng.lng]);
+  S.elems[editPotId].geom.coords=coords;
+  buildEditPotMarkers();
+}
+
+function removeEditVertex(idx){
+  var coords=getEditPotCoords();
+  if(coords.length<=3){showToast('⚠️','Mínimo 3 vértices','No se puede eliminar — el polígono requiere al menos 3 puntos.');return;}
+  coords.splice(idx,1);
+  S.elems[editPotId].geom.coords=coords;
+  buildEditPotMarkers();
+}
+
+function saveEditPot(){
+  var coords=getEditPotCoords();
+  if(coords.length<3){showToast('⚠️','Polígono incompleto','Se necesitan al menos 3 vértices.');return;}
+  var el=S.elems[editPotId];
+  var lat=coords.reduce(function(s,c){return s+c[0];},0)/coords.length;
+  var lng=coords.reduce(function(s,c){return s+c[1];},0)/coords.length;
+  el.geom={type:'Polygon',coords:coords,lat:lat,lng:lng};
+  addHist('Config','Editó vértices de "'+el.name+'"',coords.length+' vértices');
+  var savedName=el.name,savedCount=coords.length;
+  editPotOrigCoords=null;
+  cancelEditPot();
+  renderAll();save();
+  showToast('✅','Potrero guardado','"'+savedName+'" actualizado con '+savedCount+' vértices.');
+}
+
+function cancelEditPot(){
+  if(editPotOrigCoords&&editPotId&&S.elems[editPotId]){
+    S.elems[editPotId].geom.coords=editPotOrigCoords;
+  }
+  if(editPotLayer){map.removeLayer(editPotLayer);editPotLayer=null;}
+  editPotMarkers=[];editPotMidMarkers=[];editPotPoly=null;
+  editPotMode=false;editPotId=null;editPotOrigCoords=null;
+  setBanner(null);
+  if(typeof renderAll==='function'&&map)renderAll();
+}
+
+// ── ELEMENT PICKER (múltiples solapados) ───────────────────────
 function showPicker(elems,px){
   const pop=document.getElementById('m-pick');
   const{energized,watered}=calcStates();
@@ -1596,9 +1824,12 @@ function renderJuncOutlets(id){
 function toggleOutlet(id,idx){
   const el=S.elems[id];if(!el||!el.outlets)return;
   el.outlets[idx].open=!el.outlets[idx].open;
-  addHist('Op',`${el.outlets[idx].open?'Abrió':'Cerró'} "${el.name}" - Salida ${idx+1}`);
-  vibrate(el.outlets[idx].open?60:[30,15,30]);
+  const nowOpen=el.outlets[idx].open;
+  const outName=el.outlets[idx].name||'Salida '+(idx+1);
+  addHist('Op',`${nowOpen?'Abrió':'Cerró'} "${el.name}" - Salida ${idx+1}`);
+  vibrate(nowOpen?60:[30,15,30]);
   renderJuncOutlets(id);renderAll();save();
+  showResultReport(`${nowOpen?'🔓 ABIERTA':'🔒 CERRADA'}: ${el.name.toUpperCase()} — ${outName}`,T[el.type].net);
 }
 
 // ── RENAME OUTLET (reemplaza prompt) ──────────────────────
@@ -1994,6 +2225,7 @@ window.addEventListener('DOMContentLoaded', function(){
       if(drawPts.length>1){var prev=drawPts[drawPts.length-2];drawLines.push(L.polyline([[prev.lat,prev.lng],[pt.lat,pt.lng]],{color:'#4caf50',weight:2,dashArray:'5 3'}).addTo(map));}
       return;
     }
+    if(editPotMode)return;
     if(addMode){exitAll();showAdd(e.latlng);return;}
     if(moveMode&&moveId){var el=S.elems[moveId];if(el){el.geom={...el.geom,lat:e.latlng.lat,lng:e.latlng.lng};addHist('Config','Movió "'+el.name+'" a nueva posición');if(JUNC.includes(el.type))autoInsertInConn(moveId,e.latlng);}exitAll();renderAll();renderCfg();save();return;}
     var near=Object.values(S.elems).filter(function(el){if(!el.geom||el.geom.type==='Polygon')return false;return map.distance(e.latlng,L.latLng(el.geom.lat,el.geom.lng))<50;});
