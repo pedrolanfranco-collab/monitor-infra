@@ -291,11 +291,12 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v60.6 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v60.7 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
     <button class="tab" onclick="goTab('potreros',this)">🌿 POTREROS</button>
+    <button class="tab" onclick="goTab('personal',this)">👷 PERSONAL</button>
     <button class="tab" onclick="goTab('historial',this)">📋 LOG</button>
     <button class="tab" onclick="goTab('red',this)">🔗 RED</button>
     <button class="tab" onclick="goTab('config',this)">⚙ CONFIG</button>
@@ -412,6 +413,21 @@ body{display:flex;flex-direction:column}
         <button onclick="startDraw();goTab('mapa',document.querySelector('.tab'))" style="background:rgba(76,175,80,.2);border:1px solid rgba(76,175,80,.4);color:var(--green2);border-radius:4px;padding:2px 8px;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0">➕ Nuevo</button>
       </div>
       <div class="scroll" id="pot-list"><div class="es"><div class="bi">🌿</div>Sin potreros.</div></div>
+    </div>
+
+    <!-- PERSONAL -->
+    <div class="pv" id="pv-personal">
+      <div class="ph">PERSONAL — DÍAS TRABAJADOS
+        <div style="display:flex;gap:6px">
+          <button onclick="openWorkerModal()" style="background:var(--surf2);border:1px solid var(--brd2);color:var(--txt2);border-radius:4px;padding:2px 8px;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer">➕ Trabajador</button>
+          <button onclick="openWorkdayModal()" style="background:rgba(76,175,80,.2);border:1px solid rgba(76,175,80,.4);color:var(--green2);border-radius:4px;padding:2px 8px;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer">➕ Día</button>
+        </div>
+      </div>
+      <div class="scroll" id="personal-wrap">
+        <div id="per-workers"><div class="es"><div class="bi">👷</div>Sin trabajadores. Agregá uno con "➕ Trabajador".</div></div>
+        <div class="ph" style="margin-top:8px;border-radius:4px">REGISTRO DE JORNALES</div>
+        <div id="per-days"><div class="es"><div class="bi">📅</div>Sin días registrados.</div></div>
+      </div>
     </div>
 
     <!-- LOG -->
@@ -697,6 +713,53 @@ body{display:flex;flex-direction:column}
   </div>
 </div>
 
+<!-- MODAL: Trabajador -->
+<div class="modal" id="m-worker">
+  <div class="mbox">
+    <h2 id="mw-title">NUEVO TRABAJADOR</h2>
+    <input type="hidden" id="mw-id">
+    <label>Nombre</label>
+    <input id="mw-name" type="text" placeholder="Ej: Juan Pérez">
+    <label>Tipo</label>
+    <select id="mw-type">
+      <option value="fijo">👷 Fijo</option>
+      <option value="ocasional">🧑‍🌾 Ocasional</option>
+    </select>
+    <label>Valor jornal ($) <span style="font-size:9px;color:var(--txt3)">— opcional</span></label>
+    <input id="mw-rate" type="number" step="1" min="0" placeholder="Ej: 2500">
+    <div class="mac">
+      <button class="m-cn" onclick="closeM('m-worker')">Cancelar</button>
+      <button class="m-dn" id="mw-del" style="display:none" onclick="delWorkerFromModal()">🗑</button>
+      <button class="m-ok" onclick="saveWorker()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Día trabajado -->
+<div class="modal" id="m-workday">
+  <div class="mbox">
+    <h2 id="mwd-title">REGISTRAR DÍA</h2>
+    <input type="hidden" id="mwd-id">
+    <label>Trabajador</label>
+    <select id="mwd-worker"></select>
+    <label>Fecha</label>
+    <input id="mwd-date" type="date">
+    <label>Cantidad de días</label>
+    <select id="mwd-qty">
+      <option value="1">1 día completo</option>
+      <option value="0.5">½ día</option>
+      <option value="2">2 días</option>
+    </select>
+    <label>Tarea / Nota <span style="font-size:9px;color:var(--txt3)">— opcional</span></label>
+    <input id="mwd-note" type="text" placeholder="Ej: arreglo de alambrado">
+    <div class="mac">
+      <button class="m-cn" onclick="closeM('m-workday')">Cancelar</button>
+      <button class="m-dn" id="mwd-del" style="display:none" onclick="delWorkdayFromModal()">🗑</button>
+      <button class="m-ok" onclick="saveWorkday()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Confirmar acción genérica (reemplaza confirm) -->
 <div class="modal" id="m-confirm">
   <div class="mbox">
@@ -782,7 +845,7 @@ var pendingGeom=null,pendingFeats=[],featIdx=0;
 var togPending=null;
 var renameCb=null;
 var confirmCb=null;
-var S={elems:{},conns:[],hist:[]};
+var S={elems:{},conns:[],hist:[],workers:[],workdays:[]};
 var LS='mhe_v1';
 var PIN_KEY='mhe_pin';
 var BACKUP_KEY='mhe_last_export';
@@ -820,7 +883,7 @@ function vibrate(pattern){
 
 // ── PERSIST ────────────────────────────────────────────────
 function save(){
-  try{localStorage.setItem(LS,JSON.stringify({elems:S.elems,conns:S.conns,hist:S.hist}));}
+  try{localStorage.setItem(LS,JSON.stringify({elems:S.elems,conns:S.conns,hist:S.hist,workers:S.workers,workdays:S.workdays}));}
   catch(e){console.warn('save error',e);}
   checkBackupWarn();
 }
@@ -832,6 +895,8 @@ function load(){
     if(d.elems)Object.assign(S.elems,d.elems);
     if(d.conns)S.conns.push(...d.conns);
     if(d.hist)S.hist.push(...d.hist);
+    if(d.workers)S.workers.push(...d.workers);
+    if(d.workdays)S.workdays.push(...d.workdays);
   }catch(e){console.warn('load error',e);}
 }
 
@@ -928,6 +993,7 @@ function goTab(name,btn){
   document.getElementById('pv-'+name).classList.add('on');
   btn.classList.add('active');
   if(name==='potreros')renderPot();
+  if(name==='personal')renderPersonal();
   if(name==='historial')renderHist();
   if(name==='config')renderCfg();
   if(name==='red')renderRed();
@@ -1318,6 +1384,146 @@ function renderHist(){
 }
 
 function addHist(u,a,r){S.hist.unshift({id:uid(),user:u,action:a,result:r||'',ts:new Date().toISOString()});if(S.hist.length>300)S.hist.pop();}
+
+// ── PERSONAL / DÍAS TRABAJADOS ──────────────────────────────
+function monthKey(dateStr){return (dateStr||'').slice(0,7);}
+
+function renderPersonal(){
+  const wEl=document.getElementById('per-workers');
+  const dEl=document.getElementById('per-days');
+  const curMonth=new Date().toISOString().slice(0,7);
+  if(!S.workers.length){
+    wEl.innerHTML='<div class="es"><div class="bi">👷</div>Sin trabajadores. Agregá uno con "➕ Trabajador".</div>';
+  }else{
+    const workers=S.workers.slice().sort((a,b)=>a.name.localeCompare(b.name,'es'));
+    wEl.innerHTML=workers.map(w=>{
+      const days=S.workdays.filter(d=>d.workerId===w.id&&monthKey(d.date)===curMonth).reduce((s,d)=>s+parseFloat(d.cant),0);
+      const cost=w.rate?days*w.rate:null;
+      const badgeBg=w.type==='fijo'?'rgba(76,175,80,.2)':'rgba(255,179,0,.2)';
+      const badgeFg=w.type==='fijo'?'var(--green2)':'var(--amber)';
+      return `<div class="pc" style="border-color:${w.type==='fijo'?'rgba(76,175,80,.3)':'rgba(255,179,0,.3)'}">
+        <div class="pc-top">
+          <span class="pc-n">${w.type==='fijo'?'👷':'🧑‍🌾'} ${w.name}</span>
+          <div style="display:flex;gap:4px;align-items:center">
+            <span class="pc-b" style="background:${badgeBg};color:${badgeFg}">${w.type==='fijo'?'FIJO':'OCASIONAL'}</span>
+            <button onclick="openWorkerModal('${w.id}')" style="background:transparent;border:1px solid var(--brd2);color:var(--txt2);border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer">✏️</button>
+          </div>
+        </div>
+        <div class="pc-pills">
+          <span class="pill pk">📅 ${days} día${days===1?'':'s'} este mes</span>
+          ${cost!==null?`<span class="pill pk">💲 $${cost.toLocaleString('es-UY')}</span>`:''}
+        </div></div>`;
+    }).join('');
+  }
+  if(!S.workdays.length){
+    dEl.innerHTML='<div class="es"><div class="bi">📅</div>Sin días registrados.</div>';
+    return;
+  }
+  const entries=S.workdays.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.ts.localeCompare(a.ts));
+  dEl.innerHTML=entries.map(d=>{
+    const w=S.workers.find(x=>x.id===d.workerId);
+    const fecha=d.date.split('-').reverse().join('/');
+    return `<div class="hi" onclick="openWorkdayModal('${d.id}')" style="cursor:pointer">
+      <div class="hi-t">📅 ${fecha} · ${w?w.name:'(trabajador eliminado)'}</div>
+      <div class="hi-a">${d.cant} día${parseFloat(d.cant)===1?'':'s'}${d.note?' · '+d.note:''}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── TRABAJADORES CRUD ───────────────────────────────────────
+function openWorkerModal(id){
+  const isEdit=!!id;
+  document.getElementById('mw-title').textContent=isEdit?'EDITAR TRABAJADOR':'NUEVO TRABAJADOR';
+  document.getElementById('mw-id').value=id||'';
+  document.getElementById('mw-del').style.display=isEdit?'':'none';
+  if(isEdit){
+    const w=S.workers.find(x=>x.id===id);
+    if(!w)return;
+    document.getElementById('mw-name').value=w.name;
+    document.getElementById('mw-type').value=w.type;
+    document.getElementById('mw-rate').value=w.rate||'';
+  }else{
+    document.getElementById('mw-name').value='';
+    document.getElementById('mw-type').value='fijo';
+    document.getElementById('mw-rate').value='';
+  }
+  document.getElementById('mw-name').style.borderColor='';
+  document.getElementById('m-worker').classList.add('on');
+  setTimeout(()=>document.getElementById('mw-name').focus(),150);
+}
+
+function saveWorker(){
+  const name=document.getElementById('mw-name').value.trim();
+  if(!name){document.getElementById('mw-name').style.borderColor='var(--red)';return;}
+  const type=document.getElementById('mw-type').value;
+  const rate=parseFloat(document.getElementById('mw-rate').value)||null;
+  const id=document.getElementById('mw-id').value;
+  if(id){
+    const w=S.workers.find(x=>x.id===id);
+    if(w){w.name=name;w.type=type;w.rate=rate;}
+  }else{
+    S.workers.push({id:uid(),name,type,rate});
+  }
+  closeM('m-worker');renderPersonal();save();
+}
+
+function delWorkerFromModal(){
+  const id=document.getElementById('mw-id').value;
+  if(!id)return;
+  askConfirm('ELIMINAR TRABAJADOR','¿Confirmar eliminación? Se conservarán los días ya registrados a su nombre.',()=>{
+    S.workers=S.workers.filter(w=>w.id!==id);
+    closeM('m-worker');renderPersonal();save();
+  });
+}
+
+// ── DÍAS TRABAJADOS CRUD ────────────────────────────────────
+function openWorkdayModal(id){
+  if(!S.workers.length){showToast('⚠️','Sin trabajadores','Agregá primero un trabajador.');return;}
+  const isEdit=!!id;
+  document.getElementById('mwd-title').textContent=isEdit?'EDITAR DÍA':'REGISTRAR DÍA';
+  document.getElementById('mwd-id').value=id||'';
+  document.getElementById('mwd-del').style.display=isEdit?'':'none';
+  const sel=document.getElementById('mwd-worker');
+  sel.innerHTML=S.workers.slice().sort((a,b)=>a.name.localeCompare(b.name,'es')).map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
+  if(isEdit){
+    const d=S.workdays.find(x=>x.id===id);
+    if(!d)return;
+    sel.value=d.workerId;
+    document.getElementById('mwd-date').value=d.date;
+    document.getElementById('mwd-qty').value=d.cant;
+    document.getElementById('mwd-note').value=d.note||'';
+  }else{
+    document.getElementById('mwd-date').value=new Date().toISOString().slice(0,10);
+    document.getElementById('mwd-qty').value='1';
+    document.getElementById('mwd-note').value='';
+  }
+  document.getElementById('m-workday').classList.add('on');
+}
+
+function saveWorkday(){
+  const workerId=document.getElementById('mwd-worker').value;
+  const date=document.getElementById('mwd-date').value;
+  if(!workerId||!date){showToast('⚠️','Faltan datos','Elegí trabajador y fecha.');return;}
+  const cant=document.getElementById('mwd-qty').value;
+  const note=document.getElementById('mwd-note').value.trim();
+  const id=document.getElementById('mwd-id').value;
+  if(id){
+    const d=S.workdays.find(x=>x.id===id);
+    if(d){d.workerId=workerId;d.date=date;d.cant=cant;d.note=note;}
+  }else{
+    S.workdays.push({id:uid(),workerId,date,cant,note,ts:new Date().toISOString()});
+  }
+  closeM('m-workday');renderPersonal();save();
+}
+
+function delWorkdayFromModal(){
+  const id=document.getElementById('mwd-id').value;
+  if(!id)return;
+  askConfirm('ELIMINAR REGISTRO','¿Confirmar eliminación de este día trabajado?',()=>{
+    S.workdays=S.workdays.filter(d=>d.id!==id);
+    closeM('m-workday');renderPersonal();save();
+  });
+}
 
 function renderCfg(){
   document.getElementById('cfg-ec').textContent=Object.keys(S.elems).length;
@@ -2036,7 +2242,7 @@ function skipFeat(){featIdx=parseInt(document.getElementById('mf-idx').value)+1;
 
 // ── JSON ───────────────────────────────────────────────────
 function exportJSON(){
-  const blob=new Blob([JSON.stringify({elems:S.elems,conns:S.conns,hist:S.hist},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({elems:S.elems,conns:S.conns,hist:S.hist,workers:S.workers,workdays:S.workdays},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   const now=new Date();
   const fecha=now.toISOString().slice(0,10);
@@ -2068,10 +2274,12 @@ async function importJSON(inp){
     }
     // Limpiar estado
     Object.keys(S.elems).forEach(function(k){delete S.elems[k];});
-    S.conns.length=0;S.hist.length=0;
+    S.conns.length=0;S.hist.length=0;S.workers.length=0;S.workdays.length=0;
     Object.assign(S.elems,d.elems);
     if(d.conns)S.conns.push.apply(S.conns,d.conns);
     if(d.hist)S.hist.push.apply(S.hist,d.hist);
+    if(d.workers)S.workers.push.apply(S.workers,d.workers);
+    if(d.workdays)S.workdays.push.apply(S.workdays,d.workdays);
     console.log('[Import] elems:',Object.keys(S.elems).length,'conns:',S.conns.length);
     save();
     // Guardar como seed propio para dispositivos nuevos
