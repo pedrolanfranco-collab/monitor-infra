@@ -131,6 +131,13 @@ svg.cerca .rot{opacity:1}
 .resumen{background:var(--papel2);border:1px solid var(--linea);border-radius:3px;padding:11px 13px;
   font-size:13.5px;white-space:pre-wrap;max-height:220px;overflow:auto}
 .nota{font-size:13px;color:var(--tinta2);margin-top:9px}
+.pie{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:9px}
+.pie button{font-family:"Barlow Condensed",sans-serif;font-size:13px;font-weight:600;letter-spacing:.4px;
+  padding:4px 13px;border-radius:3px;border:1px solid var(--linea);background:var(--papel2);
+  color:var(--tinta);cursor:pointer}
+.pie button:hover{border-color:var(--tinta3)}
+.pie button:focus-visible{outline:2px solid var(--propuesta);outline-offset:2px}
+.guardado{font-size:12px;color:var(--tinta3);font-family:"Barlow Condensed",sans-serif;letter-spacing:.4px}
 .pt{font-family:"Barlow Condensed",sans-serif;font-size:9.5px;fill:var(--tinta3)}
 </style>
 
@@ -175,7 +182,12 @@ svg.cerca .rot{opacity:1}
       <div class="cifra"><b id="n-pend">23</b><span class="lbl">sin decidir</span></div>
     </div>
     <div class="resumen" id="resumen">Todavía no decidiste ninguna.</div>
-    <p class="nota">Cuando termines, pasame lo que dice este resumen y dibujo los caños en la app.</p>
+    <div class="pie">
+      <button id="btn-copiar">Copiar resumen</button>
+      <button id="btn-limpiar">Empezar de nuevo</button>
+      <span class="guardado" id="guardado"></span>
+    </div>
+    <p class="nota">Podés ir decidiendo de a poco: lo que marcás queda guardado en este navegador y sigue acá cuando vuelvas. Cuando termines, copiá el resumen y pasámelo.</p>
   </div>
 </div>
 
@@ -362,7 +374,23 @@ function duda(p){
   return null;
 }
 
-const estado = {};
+/* Las decisiones quedan guardadas en este navegador, para poder decidir de a
+   poco y volver otro día. Puede fallar (ventana privada, datos del sitio
+   borrados), asi que todo va envuelto y la pagina funciona igual sin esto. */
+const CLAVE = 'croquis_red_agua_v1';
+let estado = {};
+try {
+  const g = localStorage.getItem(CLAVE);
+  if (g) estado = JSON.parse(g) || {};
+} catch (e) { estado = {}; }
+
+function guardar(){
+  try { localStorage.setItem(CLAVE, JSON.stringify(estado)); } catch (e) {}
+  const n = Object.keys(estado).length;
+  const el = document.getElementById('guardado');
+  if (el) el.textContent = n ? 'Guardado · ' + n + ' de ' + D.propuestas.length + ' decididas' : '';
+}
+
 let sel = null;
 let foco = null;   // fila sobre la que esta el puntero
 
@@ -403,6 +431,7 @@ function render(){
     const i = +b.dataset.i, v = b.dataset.v;
     estado[i] = estado[i] === v ? undefined : v;
     if (estado[i] === undefined) delete estado[i];
+    guardar();
     sel = i; render(); dibujar(); enfocar(i);
   }));
   contar();
@@ -428,6 +457,30 @@ function contar(){
 render();
 dibujar();
 instalarGestos();
+guardar();
+
+document.getElementById('btn-copiar').addEventListener('click', async () => {
+  const t = document.getElementById('resumen').textContent;
+  const b = document.getElementById('btn-copiar');
+  try {
+    await navigator.clipboard.writeText(t);
+    b.textContent = 'Copiado';
+  } catch (e) {
+    /* sin permiso de portapapeles: se selecciona para copiar a mano */
+    const r = document.createRange();
+    r.selectNodeContents(document.getElementById('resumen'));
+    const sn = getSelection(); sn.removeAllRanges(); sn.addRange(r);
+    b.textContent = 'Seleccionado — copiá con Ctrl+C';
+  }
+  setTimeout(() => { b.textContent = 'Copiar resumen'; }, 2600);
+});
+
+document.getElementById('btn-limpiar').addEventListener('click', () => {
+  if (!Object.keys(estado).length) return;
+  if (!confirm('Se borran las ' + Object.keys(estado).length + ' decisiones tomadas. ¿Seguro?')) return;
+  estado = {};
+  guardar(); sel = null; render(); dibujar(); verTodo();
+});
 </script>`;
 
 const salida = process.argv[2] || path.join(__dirname, 'croquis.html');
