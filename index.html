@@ -293,7 +293,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.3 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.4 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -363,6 +363,17 @@ body{display:flex;flex-direction:column}
               <div class="sc"><div class="sv" id="s-an" style="color:var(--amber)">—</div><div class="sl">💧 SIN AGUA</div></div>
             </div>
           </div>
+        </div>
+
+        <!-- SECCIÓN: Bebederos sin agua -->
+        <div class="sec sec-beb" id="sec-beb">
+          <div class="sec-hdr" onclick="toggleSec('sec-beb')">
+            <span style="font-size:13px">🐄</span>
+            <span class="sec-title">Bebederos sin agua</span>
+            <span class="sec-badge" id="badge-beb">—</span>
+            <span class="sec-arrow">▼</span>
+          </div>
+          <div class="sec-body"><div id="beb-aviso" style="padding:8px"></div></div>
         </div>
 
         <!-- SECCIÓN: Llaves operables -->
@@ -1274,7 +1285,60 @@ function renderInfra(){
   }).join('');
 }
 
+// ── AVISO DE BEBEDEROS SIN AGUA ────────────────────────────
+// Distingue las dos causas, que se arreglan de formas muy distintas:
+// una llave cerrada se abre; un caño que falta hay que dibujarlo.
+function llaveCulpable(bebId){
+  var adj={};
+  Object.keys(S.elems).forEach(function(i){adj[i]=[];});
+  S.conns.forEach(function(c){ if(adj[c.from])adj[c.from].push(c.to); if(adj[c.to])adj[c.to].push(c.from); });
+  var vis=new Set([bebId]), q=[bebId];
+  while(q.length){
+    var x=q.shift();
+    for(var i=0;i<(adj[x]||[]).length;i++){
+      var y=adj[x][i]; if(vis.has(y))continue;
+      var el=S.elems[y]; if(!el)continue;
+      vis.add(y);
+      if(T[el.type]&&T[el.type].valve&&!el.on) return el;  // la primera cerrada saliendo del bebedero
+      q.push(y);
+    }
+  }
+  return null;
+}
+
+function renderAvisoBebederos(wa){
+  var cont=document.getElementById('beb-aviso');
+  var badge=document.getElementById('badge-beb');
+  if(!cont)return;
+  var beb=Object.values(S.elems).filter(function(e){return e.type==='bebedero';});
+  var sin=beb.filter(function(b){return !wa.has(b.id);});
+  var alc=alcanzablesDesdeTanques();
+  var porLlave=sin.filter(function(b){return alc.has(b.id);});
+  var sinCano=sin.filter(function(b){return !alc.has(b.id);});
+  if(badge) badge.textContent = sin.length ? sin.length+' de '+beb.length : 'todos con agua';
+  if(!sin.length){
+    cont.innerHTML='<div class="sim ok"><div class="sim-t">✅ Los '+beb.length+' bebederos tienen agua</div></div>';
+    return;
+  }
+  var h='';
+  if(porLlave.length){
+    h+='<div class="sim"><div class="sim-t">⚠ '+porLlave.length+' SIN AGUA POR LLAVE CERRADA</div><ul>';
+    porLlave.forEach(function(b){
+      var l=llaveCulpable(b.id);
+      h+='<li><b>'+b.name+'</b>'+(l?' — cerrada: <b>'+l.name+'</b>':'')+'</li>';
+    });
+    h+='</ul></div>';
+  }
+  if(sinCano.length){
+    h+='<div class="sim"><div class="sim-t">🔌 '+sinCano.length+' SIN CAÑO HASTA UN TANQUE</div><ul>';
+    sinCano.forEach(function(b){ h+='<li>'+b.name+'</li>'; });
+    h+='</ul><div style="font-size:10px;color:var(--txt3);margin-top:4px">Se resuelven en Configuración → Conexiones pendientes.</div></div>';
+  }
+  cont.innerHTML=h;
+}
+
 function renderStats(en,wa){
+  renderAvisoBebederos(wa);
   var pts=Object.values(S.elems).filter(function(e){return e.type==='potrero';});
   var eo=pts.filter(function(p){return en.has(p.id);}).length;
   var wo=pts.filter(function(p){return wa.has(p.id);}).length;
