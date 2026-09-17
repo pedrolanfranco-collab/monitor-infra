@@ -31,21 +31,21 @@ const HTML = `<title>Croquis de la red de agua</title>
   --papel:#f4f1e9; --papel2:#eae5d9; --linea:#d6cfbe;
   --tinta:#1f2e28; --tinta2:#5c6b63; --tinta3:#8b968e;
   --s-cerroSur:#1f6f97; --s-casaNorte:#946420; --s-cerroNorte:#2f7d5a; --s-casaSur:#9c3b33;
-  --propuesta:#c2410c; --ok:#2f7d5a; --no:#9c3b33; --duda:#a06a00;
+  --propuesta:#c2410c; --ok:#2f7d5a; --no:#9c3b33; --duda:#a06a00; --foco:#7c2d91;
   --sombra:0 1px 2px rgba(31,46,40,.08);
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --papel:#141a17; --papel2:#1c2420; --linea:#2e3a34;
   --tinta:#e7e4d9; --tinta2:#a3b0a7; --tinta3:#74817a;
   --s-cerroSur:#5fa9d0; --s-casaNorte:#d2a04a; --s-cerroNorte:#63b98d; --s-casaSur:#d97066;
-  --propuesta:#f08a52; --ok:#63b98d; --no:#d97066; --duda:#d2a04a;
+  --propuesta:#f08a52; --ok:#63b98d; --no:#d97066; --duda:#d2a04a; --foco:#e07bf0;
   --sombra:0 1px 2px rgba(0,0,0,.4);
 }}
 :root[data-theme="dark"]{
   --papel:#141a17; --papel2:#1c2420; --linea:#2e3a34;
   --tinta:#e7e4d9; --tinta2:#a3b0a7; --tinta3:#74817a;
   --s-cerroSur:#5fa9d0; --s-casaNorte:#d2a04a; --s-cerroNorte:#63b98d; --s-casaSur:#d97066;
-  --propuesta:#f08a52; --ok:#63b98d; --no:#d97066; --duda:#d2a04a;
+  --propuesta:#f08a52; --ok:#63b98d; --no:#d97066; --duda:#d2a04a; --foco:#e07bf0;
   --sombra:0 1px 2px rgba(0,0,0,.4);
 }
 *{box-sizing:border-box}
@@ -82,6 +82,7 @@ h2{font-size:21px;font-weight:600;letter-spacing:.5px;margin:26px 0 10px;
   opacity:0;transition:opacity .15s;pointer-events:none}
 svg.cerca .rot{opacity:1}
 .rot.suelto{fill:var(--propuesta);font-weight:600}
+.rot.enfoco{opacity:1 !important;fill:var(--foco);font-weight:600}
 .leyenda{display:flex;flex-wrap:wrap;gap:4px 14px;padding:9px 12px;border-top:1px solid var(--linea);font-size:12px;color:var(--tinta2)}
 .leyenda span{display:flex;align-items:center;gap:5px}
 .sw{width:15px;height:3px;border-radius:2px;flex:none}
@@ -92,6 +93,7 @@ svg.cerca .rot{opacity:1}
   background:var(--papel2);padding:9px 11px;margin-bottom:7px;cursor:pointer;box-shadow:var(--sombra)}
 .fila:hover{border-color:var(--tinta3)}
 .fila.sel{outline:2px solid var(--propuesta);outline-offset:1px}
+.fila.foco{border-color:var(--foco);box-shadow:0 0 0 2px var(--foco) inset}
 .fila.si{border-left-color:var(--ok)}
 .fila.no{border-left-color:var(--no);opacity:.55}
 .fila.duda{border-left-color:var(--duda)}
@@ -240,15 +242,23 @@ function dibujar(){
     const a = porId[p.de], b = porId[p.a]; if (!a || !b) return;
     const d = dec[i];
     if (d === 'no') return;
-    const col = d === 'si' ? 'var(--ok)' : 'var(--propuesta)';
+    const col = i === foco ? 'var(--foco)' : (d === 'si' ? 'var(--ok)' : 'var(--propuesta)');
     s += '<line x1="' + X(a.lon).toFixed(1) + '" y1="' + Y(a.lat).toFixed(1) +
          '" x2="' + X(b.lon).toFixed(1) + '" y2="' + Y(b.lat).toFixed(1) +
-         '" stroke="' + col + '" stroke-width="' + ((i === sel ? 4.5 : 2.6)*k).toFixed(2) + '"' +
+         '" stroke="' + col + '" stroke-width="' + ((i === foco ? 5.5 : i === sel ? 4.5 : 2.6)*k).toFixed(2) + '"' +
          (d === 'si' ? '' : ' stroke-dasharray="' + (7*k).toFixed(2) + ' ' + (5*k).toFixed(2) + '"') + ' stroke-linecap="round"/>';
   });
+  const extremos = foco === null ? new Set()
+    : new Set([D.propuestas[foco].de, D.propuestas[foco].a]);
   D.elementos.forEach(e => {
-    const r = (e.tipo === 'tanque' ? 6 : e.tipo === 'bebedero' ? 4 : 2.6) * k;
-    const f = e.tipo === 'tanque' ? (COLOR[e.sistema] || 'var(--tinta2)')
+    if (extremos.has(e.id)) {
+      s += '<circle cx="' + X(e.lon).toFixed(1) + '" cy="' + Y(e.lat).toFixed(1) +
+           '" r="' + (11 * k).toFixed(2) + '" fill="none" stroke="var(--foco)" stroke-width="' +
+           (2 * k).toFixed(2) + '" opacity=".85"/>';
+    }
+    const r = (extremos.has(e.id) ? 7 : e.tipo === 'tanque' ? 6 : e.tipo === 'bebedero' ? 4 : 2.6) * k;
+    const f = extremos.has(e.id) ? 'var(--foco)'
+            : e.tipo === 'tanque' ? (COLOR[e.sistema] || 'var(--tinta2)')
             : e.suelto ? 'var(--propuesta)' : (COLOR[e.sistema] || 'var(--tinta3)');
     s += '<circle cx="' + X(e.lon).toFixed(1) + '" cy="' + Y(e.lat).toFixed(1) + '" r="' + r.toFixed(2) +
          '" fill="' + f + '" stroke="var(--papel2)" stroke-width="' + (1*k).toFixed(2) + '"/>';
@@ -257,7 +267,8 @@ function dibujar(){
   D.elementos.forEach(e => {
     const esTanque = e.tipo === 'tanque';
     const txt = esTanque ? e.nombre.replace('Tanque ', '') + ' · ' + e.cota + ' m' : e.nombre;
-    s += '<text class="' + (esTanque ? 'pt' : 'rot' + (e.suelto ? ' suelto' : '')) + '" x="' +
+    s += '<text class="' + (esTanque ? 'pt' : 'rot' + (e.suelto ? ' suelto' : '')) +
+         (extremos.has(e.id) ? ' rot enfoco' : '') + '" x="' +
          (X(e.lon) + 7*k).toFixed(1) + '" y="' + (Y(e.lat) + 3.5*k).toFixed(1) +
          '" font-size="' + ((esTanque ? 9.5 : 11) * k).toFixed(2) + '" stroke-width="' + (3*k).toFixed(2) + '">' +
          txt.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</text>';
@@ -339,6 +350,7 @@ function duda(p){
 
 const estado = {};
 let sel = null;
+let foco = null;   // fila sobre la que esta el puntero
 
 function render(){
   ['sistema','suelto'].forEach(tipo => {
@@ -348,7 +360,7 @@ function render(){
       if (p.tipo !== tipo) return;
       const d = estado[i], av = duda(p);
       const div = document.createElement('div');
-      div.className = 'fila' + (d ? ' ' + d : (av ? ' duda' : '')) + (sel === i ? ' sel' : '');
+      div.className = 'fila' + (d ? ' ' + d : (av ? ' duda' : '')) + (sel === i ? ' sel' : '') + (foco === i ? ' foco' : '');
       div.innerHTML =
         '<div class="ruta">' + p.deNombre + ' <span class="flecha">→</span> ' + p.aNombre + '</div>' +
         '<div class="meta num">' + p.metros + ' m · ' + p.deTipo.replace(/_/g,' ') + ' → ' + p.aTipo.replace(/_/g,' ') + '</div>' +
@@ -360,6 +372,15 @@ function render(){
       div.addEventListener('click', ev => {
         if (ev.target.tagName === 'BUTTON') return;
         sel = sel === i ? null : i; render(); dibujar(); if (sel !== null) enfocar(sel);
+      });
+      /* Resaltar al pasar por encima: se toca la clase de la fila a mano en vez
+         de re-renderizar, porque render() borra el nodo que tiene el puntero. */
+      div.addEventListener('pointerenter', () => {
+        foco = i; div.classList.add('foco'); dibujar();
+      });
+      div.addEventListener('pointerleave', () => {
+        if (foco !== i) return;
+        foco = null; div.classList.remove('foco'); dibujar();
       });
       cont.appendChild(div);
     });
