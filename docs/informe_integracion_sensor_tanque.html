@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Integración del sensor de nivel — Establecimiento La Vuelta</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 16mm 16mm; }
+* { box-sizing: border-box; }
+body{
+  font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+  font-size: 10.2pt; line-height: 1.5; color:#1d2b1f; margin:0;
+}
+h1{ font-size:19pt; line-height:1.2; margin:0 0 4px; color:#1b5e20; letter-spacing:-.2px }
+h2{ font-size:12.5pt; margin:18px 0 7px; color:#1b5e20;
+    border-bottom:2px solid #a5d6a7; padding-bottom:3px; page-break-after:avoid }
+h3{ font-size:10.8pt; margin:12px 0 4px; color:#2e5c32; page-break-after:avoid }
+p{ margin:0 0 8px; text-align:justify }
+ul{ margin:0 0 9px; padding-left:17px } li{ margin-bottom:3px }
+small{ font-size:8.6pt; color:#5a6b5c }
+
+.cover{ border-left:5px solid #2e7d32; padding:2px 0 2px 13px; margin-bottom:6px }
+.sub{ font-size:11pt; color:#41603f; margin:2px 0 0 }
+.meta{ margin:12px 0 4px; font-size:8.8pt; color:#5a6b5c }
+.meta b{ color:#2e5c32 }
+
+table{ border-collapse:collapse; width:100%; margin:6px 0 12px; font-size:9.2pt;
+       page-break-inside:avoid }
+th{ background:#e8f5e9; color:#1b5e20; text-align:left; font-weight:700;
+    padding:5px 7px; border:1px solid #c8e6c9 }
+td{ padding:5px 7px; border:1px solid #d9e8da; vertical-align:top }
+tr:nth-child(even) td{ background:#f7fbf7 }
+td.num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap }
+
+.kpis{ display:flex; gap:7px; margin:10px 0 14px; flex-wrap:wrap }
+.kpi{ flex:1 1 0; min-width:80px; border:1px solid #c8e6c9; border-radius:5px;
+      padding:7px 8px; background:#f4faf4; text-align:center }
+.kpi .v{ font-size:16pt; font-weight:700; color:#1b5e20; line-height:1 }
+.kpi .l{ font-size:7.4pt; color:#5a6b5c; text-transform:uppercase; letter-spacing:.4px;
+         margin-top:3px; line-height:1.25 }
+
+.box{ border:1px solid #c8e6c9; border-left:4px solid #2e7d32; background:#f4faf4;
+      padding:9px 12px; margin:10px 0; page-break-inside:avoid }
+.box.ask{ border-left-color:#ef6c00; background:#fff8f1; border-color:#ffe0b2 }
+.box h3{ margin-top:0 }
+.box p:last-child, .box ul:last-child{ margin-bottom:0 }
+
+.flow{ font-family:"DejaVu Sans Mono","Liberation Mono",monospace; font-size:8.6pt;
+       background:#f4faf4; border:1px solid #c8e6c9; border-radius:4px;
+       padding:9px 11px; margin:8px 0 12px; line-height:1.65; white-space:pre;
+       page-break-inside:avoid }
+
+.pb{ page-break-before:always }
+footer{ margin-top:20px; border-top:1px solid #c8e6c9; padding-top:6px;
+        font-size:8.4pt; color:#6b7d6d }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Sensor de nivel del tanque australiano</h1>
+  <div class="sub">Qué estamos haciendo en el campo y dónde entra el sensor</div>
+</div>
+<div class="meta">
+  <b>Establecimiento:</b> La Vuelta — Departamento de Rivera, Uruguay &nbsp;·&nbsp;
+  <b>Actividad:</b> ganadería extensiva &nbsp;·&nbsp;
+  <b>Fecha:</b> 17 de setiembre de 2026<br>
+  <b>Para:</b> equipo de la aplicación del sensor de nivel &nbsp;·&nbsp;
+  <b>Contacto:</b> Pedro Lanfranco
+</div>
+
+<h2>1. En una página: para qué les escribimos</h2>
+<p>
+En el campo el agua es el factor que manda sobre el pastoreo: un potrero con pasto pero sin
+bebedero andando no sirve, y una llave cerrada por olvido puede dejar veinte bebederos secos sin
+que nadie se entere hasta que se ve la hacienda amontonada en un alambrado.
+Para resolver eso desarrollamos <b>dos aplicaciones propias</b> que hoy están en uso:
+una lleva la <b>hacienda potrero por potrero</b> y la otra es un <b>monitor de la red hidráulica y
+eléctrica</b> que sabe, en cada momento, qué bebedero y qué potrero tienen agua.
+</p>
+<p>
+Las dos funcionan enteramente sin conexión, porque en el campo no hay señal confiable.
+Y las dos tienen hoy <b>un solo dato que se carga a mano: si el tanque tiene agua o no</b>.
+Ese es exactamente el dato que mide el sensor de ustedes. Si podemos leerlo, todo el resto del
+cálculo —bebederos, potreros, avisos— pasa de ser una suposición a ser información real.
+</p>
+
+<div class="kpis">
+  <div class="kpi"><div class="v">81</div><div class="l">puntos<br>relevados</div></div>
+  <div class="kpi"><div class="v">4</div><div class="l">tanques /<br>reservas</div></div>
+  <div class="kpi"><div class="v">21</div><div class="l">bebederos</div></div>
+  <div class="kpi"><div class="v">31</div><div class="l">llaves<br>de corte</div></div>
+  <div class="kpi"><div class="v">58</div><div class="l">tramos de<br>cañería</div></div>
+  <div class="kpi"><div class="v">31</div><div class="l">potreros</div></div>
+</div>
+
+<h2>2. Las dos aplicaciones</h2>
+<table>
+  <tr>
+    <th style="width:22%"></th>
+    <th style="width:39%">App de potreros y hacienda</th>
+    <th style="width:39%">Monitor hidráulico y eléctrico</th>
+  </tr>
+  <tr><td><b>Qué resuelve</b></td>
+      <td>Dónde está cada lote de animales, cuántos hay y cuánta carga soporta cada potrero.</td>
+      <td>Por dónde corre el agua y la energía, y quién queda sin servicio si se abre o cierra una llave.</td></tr>
+  <tr><td><b>Estado</b></td>
+      <td>En uso diario. Dos establecimientos: La&nbsp;Vuelta (31 potreros) y María&nbsp;Laura (4).</td>
+      <td>En uso. Versión 61.4, con los 81 puntos de la red ya cargados y cotas de cada uno.</td></tr>
+  <tr><td><b>Formato</b></td>
+      <td>Aplicación web instalable (un solo archivo HTML, sin servidor propio).</td>
+      <td>Aplicación web instalable (PWA con service worker y caché propia).</td></tr>
+  <tr><td><b>Sin conexión</b></td>
+      <td>100 %. Los cambios se encolan y se sincronizan cuando vuelve la señal.</td>
+      <td>100 %. Todo el estado vive en el dispositivo; el respaldo es un archivo JSON.</td></tr>
+  <tr><td><b>Sincronización</b></td>
+      <td>Por eventos entre celular y PC: nadie pisa el trabajo del otro, sin importar quién tuvo señal primero.</td>
+      <td>Exportación e importación de respaldo entre dispositivos.</td></tr>
+</table>
+
+<h3>2.1. App de potreros y hacienda — funcionalidades</h3>
+<ul>
+  <li><b>Mapa real del establecimiento</b> con los polígonos de cada potrero sobre imagen satelital, importados desde KMZ.</li>
+  <li><b>Existencias por potrero y categoría</b> (bovinos, ovinos, equinos), con altas, bajas y movimientos entre potreros desde el celular.</li>
+  <li><b>Dueño por partida de animales</b> en los campos con hacienda de varias personas, de modo que el dueño viaja con los animales en cada movimiento.</li>
+  <li><b>Unidades ganaderas y dotación</b>: coeficientes UG editables por categoría y cálculo automático de la carga por hectárea de cada potrero.</li>
+  <li><b>Alertas</b> por sobrecarga y por situaciones que requieren atención.</li>
+  <li><b>Carga por voz</b>: se dicta el movimiento en lenguaje natural y la app lo interpreta. Es el único lugar donde usamos IA; los cálculos y las alertas son reglas fijas, auditables y offline.</li>
+  <li><b>Aguadas e instalaciones</b> marcadas sobre el mapa.</li>
+  <li><b>Salidas</b>: reporte en PDF, planilla Excel, KML para Google Earth y respaldo en JSON.</li>
+  <li><b>Dos variantes de la misma app</b>: la de PC con los reportes pesados, y la del celular aliviana lo que no se usa a caballo y suma GPS para saber en qué potrero está uno parado.</li>
+</ul>
+
+<h3>2.2. Monitor hidráulico y eléctrico — funcionalidades</h3>
+<ul>
+  <li><b>Toda la red sobre el mapa</b>: tanques, bombas (eléctrica y solar), llaves de corte, T y cruces, uniones, bebederos y potreros. Se importa desde KMZ del relevamiento a campo.</li>
+  <li><b>Motor de propagación</b>: partiendo de cada tanque y de cada energizador, calcula qué elementos quedan con agua y con energía siguiendo la cañería real, respetando llaves cerradas y salidas individuales de cada distribuidor.</li>
+  <li><b>Gravedad y cotas</b>: los 81 puntos tienen cota cargada (de 166 a 197,2 m). El agua no se le asigna a un punto más alto que el tanque del que cuelga, y cada tanque se evalúa con su propia cota. Sin esto, el sistema mentía en la parte alta del campo.</li>
+  <li><b>Simulación antes de operar</b>: antes de confirmar la apertura o el cierre de una llave, muestra qué potreros y bebederos van a quedar con agua y cuáles sin ella. Después de la maniobra emite el reporte completo del resultado.</li>
+  <li><b>Aviso de bebederos sin agua separando las dos causas</b>, que se arreglan de manera muy distinta:
+      <em>sin agua por llave cerrada</em> (y dice cuál llave, por nombre) o <em>sin caño hasta ningún tanque</em>.</li>
+  <li><b>Conexiones pendientes</b>: lista los elementos que no llegan a ningún tanque y propone los vecinos más cercanos, con la distancia en metros, para completar el trazado.</li>
+  <li><b>Esquema de red</b> en diagrama, además del mapa, con el sentido de circulación del agua y de la energía.</li>
+  <li><b>Estado por potrero</b>: un potrero figura con agua si tiene adentro un bebedero con agua. Este es el punto donde el monitor se toca con la app de hacienda.</li>
+  <li><b>Registro de operaciones</b>: quién abrió o cerró qué y cuándo.</li>
+  <li><b>GPS</b> para ubicarse en el mapa mientras se recorre, respaldo en JSON con aviso de respaldo vencido, y PIN para las acciones destructivas.</li>
+</ul>
+
+<h2 class="pb">3. Cómo está la red hoy</h2>
+<p>
+El relevamiento está terminado y cargado. La red no es una sola: son <b>cuatro sistemas</b> que
+hoy trabajan separados, y una parte de los accesorios relevados todavía no tiene cañería
+dibujada que los una a un tanque.
+</p>
+<table>
+  <tr><th style="width:46%">Sistema</th><th class="num">Elementos</th><th>Observación</th></tr>
+  <tr><td>Tanque Cerro Sur</td><td class="num">35</td><td>El más extendido del campo</td></tr>
+  <tr><td>Tanque Casa Norte</td><td class="num">16</td><td>Alimentado por bomba eléctrica</td></tr>
+  <tr><td>Tanque Cerro Norte</td><td class="num">8</td><td>Alimentado por bomba solar</td></tr>
+  <tr><td>Tanque Casa Sur</td><td class="num">1</td><td>Sin trazado propio todavía</td></tr>
+  <tr><td>Sin conectar a ningún tanque</td><td class="num">21</td><td>Uniones, pasos de zanja y bebederos por vincular</td></tr>
+</table>
+<p>
+Sobre esa base la aplicación ya calculó un <b>trazado propuesto para completar la red</b>:
+23 tramos por un total aproximado de <b>2.621 metros</b> de cañería, de los cuales el tramo
+determinante es la <b>unión del sistema del Cerro con el de la Casa: 279 metros</b>. Con esa unión
+hecha, un mismo tanque puede cubrir potreros que hoy dependen de otro, y ahí el nivel de cada
+tanque pasa a ser una decisión de manejo diaria y no un dato de curiosidad.
+</p>
+
+<h2>4. Dónde entra el sensor de ustedes</h2>
+<p>
+El monitor ya sabe, para cada tanque, <b>a qué llega el agua de ese tanque</b>. Lo que no sabe es
+<b>cuánta agua hay en el tanque</b>: hoy el tanque tiene un estado de dos posiciones —con agua o
+sin agua— que alguien pone a mano. Todo lo demás se deduce solo:
+</p>
+<div class="flow">SENSOR DE NIVEL  →  estado del tanque  →  motor de propagación (cañería + cotas + llaves)
+                                                      │
+                                                      ├→  21 bebederos con / sin agua
+                                                      ├→  potreros con / sin agua
+                                                      ├→  aviso: "B 7 sin agua — cerrada: Llave B 7"
+                                                      └→  app de hacienda: carga sobre potreros con agua</div>
+<p>
+Es decir: <b>un solo dato de ustedes se multiplica por toda la red</b>. Reemplazar ese interruptor
+manual por la lectura del sensor es, para nosotros, la mejora individual más grande que le
+podemos hacer al sistema hoy. Y hacia adelante, con nivel medido en el tiempo podemos calcular
+el <b>consumo real por día</b> y cruzarlo contra las unidades ganaderas que la otra app ya tiene
+cargadas en los potreros que cuelgan de ese tanque: eso nos permitiría anticipar el faltante de
+agua <b>antes</b> de que el tanque se vacíe, que es el problema que de verdad cuesta plata.
+</p>
+
+<div class="box ask">
+  <h3>Lo que necesitaríamos de la aplicación del sensor</h3>
+  <p>Ordenado por importancia para nosotros:</p>
+  <ul>
+    <li><b>Acceso a la lectura desde afuera de su app</b> —una consulta HTTPS que devuelva el dato en JSON, o un aviso automático a una dirección nuestra cuando hay lectura nueva. Con cualquiera de las dos formas nos arreglamos.</li>
+    <li><b>Contenido mínimo de esa lectura</b>: identificador del tanque, nivel (en porcentaje, centímetros o metros cúbicos, como lo tengan), fecha y hora de la medición, y estado del equipo (batería y última comunicación). El estado del equipo importa tanto como el nivel: necesitamos poder distinguir "el tanque está vacío" de "hace seis horas que el sensor no habla".</li>
+    <li><b>Histórico</b> de al menos los últimos meses, para calcular consumo y tendencia.</li>
+    <li><b>Umbrales configurables</b> con aviso automático cuando el nivel baja de cierto punto.</li>
+    <li><b>Varios tanques en una misma cuenta</b>: tenemos cuatro puntos de reserva y la idea es instrumentarlos progresivamente.</li>
+    <li><b>Comportamiento sin cobertura</b>: saber cada cuánto transmite el equipo, qué pasa si pierde señal y si guarda las lecturas para mandarlas después. En este campo la señal es intermitente y todo nuestro sistema está diseñado para eso.</li>
+  </ul>
+</div>
+
+<div class="box">
+  <h3>De nuestro lado</h3>
+  <ul>
+    <li>No necesitamos que ustedes integren nada ni que desarrollen a medida: con poder leer el dato alcanza, la integración la hacemos nosotros.</li>
+    <li>No vamos a comandar nada a través de ustedes: el sensor es de lectura, las maniobras de llaves y bombas siguen siendo manuales y registradas en el monitor.</li>
+    <li>Podemos trabajar contra un equipo de prueba antes de instrumentar los cuatro tanques.</li>
+  </ul>
+</div>
+
+<h2>5. Qué resolvería, en concreto</h2>
+<table>
+  <tr><th style="width:38%">Situación de hoy</th><th>Con la lectura del sensor integrada</th></tr>
+  <tr><td>El estado del tanque se carga a mano y depende de que alguien haya ido a mirarlo.</td>
+      <td>El estado se actualiza solo y el resto de la red se recalcula en el momento.</td></tr>
+  <tr><td>Un bebedero seco se descubre cuando se ve la hacienda amontonada.</td>
+      <td>El aviso aparece en la aplicación, con el bebedero y la causa probable identificados.</td></tr>
+  <tr><td>Antes de mover hacienda a un potrero hay que ir a verificar el agua.</td>
+      <td>La app de hacienda ya sabe si ese potrero tiene agua asegurada.</td></tr>
+  <tr><td>No sabemos cuánta agua consume realmente cada sistema.</td>
+      <td>Consumo por día y por sistema, cruzable contra las unidades ganaderas cargadas.</td></tr>
+  <tr><td>El dimensionamiento de la red se decide por criterio.</td>
+      <td>Se decide con la curva de consumo medida de cada tanque.</td></tr>
+</table>
+
+<h2>6. Próximo paso</h2>
+<p>
+Nos sirve una conversación técnica corta con quien maneje la parte de datos de la aplicación,
+para ver de qué manera podemos leer las mediciones y con qué frecuencia. Con eso definido,
+la integración del lado nuestro es acotada: es un solo punto del sistema el que cambia.
+</p>
+
+<footer>
+  Establecimiento La Vuelta — Rivera, Uruguay · Monitor hidráulico y eléctrico v61.4 ·
+  Informe preparado el 17/09/2026 para el equipo de la aplicación del sensor de nivel.
+</footer>
+
+</body>
+</html>
