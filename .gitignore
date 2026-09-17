@@ -1,1 +1,5 @@
-.claude/
+# Los ajustes locales de Claude Code no se versionan...
+.claude/*
+# ...pero las skills del proyecto sí: son parte de cómo se trabaja este repo.
+# (hay que re-incluir el directorio, git no entra en una carpeta ignorada)
+!.claude/skills/
