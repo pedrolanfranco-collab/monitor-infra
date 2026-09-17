@@ -2,7 +2,7 @@
 // La versión se lee del index.html automáticamente al instalar.
 // Si no puede leerla, usa el timestamp del momento de instalación.
 
-const FALLBACK_CACHE = 'mhe-v60.6';
+const FALLBACK_CACHE = 'mhe-v61.0';
 
 const STATIC = [
   './index.html',
@@ -19,7 +19,9 @@ async function getCacheName() {
   try {
     const r = await fetch('./index.html');
     const html = await r.text();
-    const m = html.match(/MONITOR HIDRÁULICO Y ELÉCTRICO · (v\d+)/);
+    // El decimal es parte de la versión: con (v\d+) un salto v61.0 -> v61.1
+    // reusaba la misma caché y el dispositivo seguía viendo la versión vieja.
+    const m = html.match(/MONITOR HIDRÁULICO Y ELÉCTRICO · (v[\d.]+)/);
     if (m) return 'mhe-' + m[1];
   } catch(e) {}
   return FALLBACK_CACHE;
