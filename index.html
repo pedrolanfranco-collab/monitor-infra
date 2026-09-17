@@ -151,6 +151,8 @@ body{display:flex;flex-direction:column}
 #btn-sat{top:10px;left:10px}
 #btn-draw{top:10px;left:110px}
 #btn-gps{top:10px;left:220px}
+#btn-lock{top:10px;right:10px}
+#btn-lock.trabado{background:var(--surf3);color:var(--amber);border-color:var(--amber)}
 #banner{position:absolute;bottom:0;left:0;right:0;z-index:600;padding:8px 14px;font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:.5px;display:none;transition:all .3s}
 
 /* GPS INFO */
@@ -291,7 +293,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.1 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.3 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -314,6 +316,7 @@ body{display:flex;flex-direction:column}
     <button class="map-btn" id="btn-sat" onclick="togLayer()">🛰 Satelital</button>
     <button class="map-btn" id="btn-draw" onclick="startDraw()">✏️ Dibujar</button>
     <button class="map-btn" id="btn-gps" onclick="togGPS()">📍 Mi ubicación</button>
+    <button class="map-btn" id="btn-lock" onclick="togTrabaMapa()" title="Trabar el mapa para que no se corra sin querer">🔒</button>
     <div id="gps-info"></div>
     <div id="legend">
       <div id="legend-hdr" onpointerdown="legendDragStart(event)"><span class="lg-grip">⠿</span> Referencias <span class="lg-arrow" id="legend-arrow">▾</span></div>
@@ -457,6 +460,13 @@ body{display:flex;flex-direction:column}
     <div class="pv" id="pv-config">
       <div class="ph">CONFIGURACIÓN</div>
       <div class="cfg">
+        <!-- Primero de todo: en el celular el panel ocupa poca altura y esto
+             quedaba enterrado detrás de las listas de elementos y conexiones. -->
+        <div class="cs"><h4>💾 Respaldo de datos</h4>
+          <button class="cb" onclick="exportJSON()">↓ Exportar JSON</button>
+          <button class="cb" onclick="document.getElementById('fi-json').click()">↑ Importar JSON</button>
+          <input type="file" id="fi-json" accept=".json,application/json,text/plain,text/*" style="display:none" onchange="importJSON(this)">
+        </div>
         <div class="cs"><h4>📂 Importar Mapa</h4>
           <div class="dz" onclick="document.getElementById('fi-kmz').click()">Seleccionar KMZ / KML</div>
           <input type="file" id="fi-kmz" accept=".kmz,.kml" style="display:none" onchange="importKMZ(this)">
@@ -483,10 +493,7 @@ body{display:flex;flex-direction:column}
           </div>
           <div id="cfg-cl"><div style="font-size:11px;color:var(--txt3)">Sin conexiones</div></div>
         </div>
-        <div class="cs"><h4>💾 Datos</h4>
-          <button class="cb" onclick="exportJSON()">↓ Exportar JSON</button>
-          <button class="cb" onclick="document.getElementById('fi-json').click()">↑ Importar JSON</button>
-          <input type="file" id="fi-json" accept=".json,application/json,text/plain,text/*" style="display:none" onchange="importJSON(this)">
+        <div class="cs"><h4>⚠️ Zona de riesgo</h4>
           <button class="cb cd" onclick="askResetAll()">✕ Borrar todo</button>
         </div>
         <div class="cs"><h4>🔐 Seguridad</h4>
@@ -755,6 +762,35 @@ var BUILD_NOTE = "";
 
 // ── VARIABLES GLOBALES DEL MAPA ────────────────────────────
 var osm, sat, map, baseL, elemL, satOn=false;
+// ── TRABA DEL MAPA ─────────────────────────────────────────
+// Arranca trabado: en el celular, arrastrar sin querer mientras se toca un
+// elemento o se hace scroll corría el mapa y había que reubicarse de nuevo.
+// Trabado se puede tocar los marcadores y usar los botones +/- igual.
+var MAPA_TRABA_KEY='mhe_map_lock';
+var mapaTrabado=true;
+try{ mapaTrabado = localStorage.getItem(MAPA_TRABA_KEY)!=='0'; }catch(e){}
+
+function aplicarTrabaMapa(){
+  if(!map)return;
+  var g=['dragging','touchZoom','doubleClickZoom','scrollWheelZoom','boxZoom','keyboard'];
+  g.forEach(function(k){ if(map[k]) mapaTrabado?map[k].disable():map[k].enable(); });
+  var b=document.getElementById('btn-lock');
+  if(b){
+    b.textContent = mapaTrabado?'🔒':'🔓';
+    b.classList.toggle('trabado',mapaTrabado);
+    b.title = mapaTrabado?'Mapa trabado — tocá para poder moverlo':'Mapa libre — tocá para trabarlo';
+  }
+}
+
+function togTrabaMapa(){
+  mapaTrabado=!mapaTrabado;
+  try{ localStorage.setItem(MAPA_TRABA_KEY,mapaTrabado?'1':'0'); }catch(e){}
+  aplicarTrabaMapa();
+  showToast(mapaTrabado?'🔒':'🔓', mapaTrabado?'Mapa trabado':'Mapa libre',
+    mapaTrabado?'No se va a mover al tocar la pantalla. Los botones + y − siguen andando.'
+               :'Ya podés arrastrarlo y hacer zoom con los dedos.');
+}
+
 function togLayer(){if(!map)return;satOn=!satOn;satOn?(map.addLayer(sat),map.removeLayer(osm)):(map.addLayer(osm),map.removeLayer(sat));var b=document.getElementById('btn-sat');if(b)b.classList.toggle('active',satOn);}
 
 // ── TIPOS ──────────────────────────────────────────────────
@@ -2410,10 +2446,11 @@ window.addEventListener('DOMContentLoaded', function(){
   var bn=document.getElementById('build-note');if(bn&&BUILD_NOTE)bn.textContent='['+BUILD_NOTE+']';
   osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
   sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
-  map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false});
+  map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false,maxBoundsViscosity:1.0});
   map.setView([-31.4,-55.42],13);
   baseL=L.layerGroup().addTo(map);
   elemL=L.layerGroup().addTo(map);
+  aplicarTrabaMapa();
   map.on('click',function(e){
     if(drawMode){
       var pt=e.latlng;
@@ -2519,7 +2556,13 @@ setTimeout(()=>{
   if(pts.length){
     const lats=pts.map(e=>e.geom.lat),lngs=pts.map(e=>e.geom.lng);
     const b=L.latLngBounds([Math.min.apply(null,lats)-.005,Math.min.apply(null,lngs)-.005],[Math.max.apply(null,lats)+.005,Math.max.apply(null,lngs)+.005]);
-    if(b.isValid())map.fitBounds(b,{padding:[40,40]});
+    if(b.isValid()){
+      map.fitBounds(b,{padding:[40,40]});
+      // Encerrar el mapa en el campo: se puede mover y hacer zoom, pero no
+      // salirse y perder de vista los elementos. Mismo criterio que las apps
+      // de potreros (maxBoundsViscosity 1 = tope rígido, no elástico).
+      map.setMaxBounds(b.pad(0.35));
+    }
   }
 },300);
 initLegend();
