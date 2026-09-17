@@ -60,11 +60,21 @@ h2{font-size:21px;font-weight:600;letter-spacing:.5px;margin:26px 0 10px;
 .lbl{text-transform:uppercase;letter-spacing:1.1px;font-size:11px;color:var(--tinta3);font-weight:600}
 .num{font-variant-numeric:tabular-nums}
 
-.cols{display:grid;grid-template-columns:1fr;gap:22px}
-@media(min-width:900px){.cols{grid-template-columns:1.05fr .95fr;align-items:start}}
-
-.plano{background:var(--papel2);border:1px solid var(--linea);border-radius:3px;overflow:hidden;position:sticky;top:env(safe-area-inset-top,0px)}
-.lienzo{position:relative;height:56vh;min-height:320px;touch-action:none;cursor:grab}
+.cols{display:block}
+/* En pantalla angosta el plano viaja pegado arriba mientras se recorre la
+   lista. En ancha, la columna se estira hasta la altura de la lista y el
+   plano queda pegajoso dentro: sin ese estirón no tiene recorrido y se va
+   con el scroll apenas pasás su altura. */
+.colmapa{position:sticky;top:env(safe-area-inset-top,0px);z-index:3;
+  background:var(--papel);padding-bottom:8px;margin-bottom:14px}
+.plano{background:var(--papel2);border:1px solid var(--linea);border-radius:3px;overflow:hidden}
+.lienzo{position:relative;height:38vh;min-height:230px;touch-action:none;cursor:grab}
+@media(min-width:900px){
+  .cols{display:grid;grid-template-columns:1.05fr .95fr;gap:22px}
+  .colmapa{position:static;padding-bottom:0;margin-bottom:0}
+  .plano{position:sticky;top:env(safe-area-inset-top,0px)}
+  .lienzo{height:64vh;min-height:420px}
+}
 .lienzo.arrastrando{cursor:grabbing}
 .lienzo #svgbox{position:absolute;inset:0}
 .lienzo svg{display:block;width:100%;height:100%}
@@ -83,7 +93,7 @@ h2{font-size:21px;font-weight:600;letter-spacing:.5px;margin:26px 0 10px;
 svg.cerca .rot{opacity:1}
 .rot.suelto{fill:var(--propuesta);font-weight:600}
 .rot.enfoco{opacity:1 !important;fill:var(--foco);font-weight:600}
-.leyenda{display:flex;flex-wrap:wrap;gap:4px 14px;padding:9px 12px;border-top:1px solid var(--linea);font-size:12px;color:var(--tinta2)}
+.leyenda{display:flex;flex-wrap:wrap;gap:2px 12px;padding:6px 10px;border-top:1px solid var(--linea);font-size:11px;color:var(--tinta2)}
 .leyenda span{display:flex;align-items:center;gap:5px}
 .sw{width:15px;height:3px;border-radius:2px;flex:none}
 .sw.d{background:none;border-top:3px dashed var(--propuesta)}
@@ -110,8 +120,12 @@ svg.cerca .rot{opacity:1}
 .acc button.on-no{background:var(--no);border-color:var(--no);color:#fff}
 .acc button:focus-visible{outline:2px solid var(--propuesta);outline-offset:2px}
 
-.tot{position:sticky;bottom:0;background:var(--papel);border-top:2px solid var(--linea);
+/* En pantalla chica el resumen NO va fijo: entre el plano pegado arriba y él
+   pegado abajo quedaban tres filas visibles. Se lee al final, no mientras
+   se decide. */
+.tot{background:var(--papel);border-top:2px solid var(--linea);
   padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px));margin-top:16px}
+@media(min-width:900px){.tot{position:sticky;bottom:0}}
 .cifras{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px}
 .cifra b{font-family:"Barlow Condensed",sans-serif;font-size:26px;font-weight:700;display:block;line-height:1}
 .resumen{background:var(--papel2);border:1px solid var(--linea);border-radius:3px;padding:11px 13px;
@@ -125,7 +139,7 @@ svg.cerca .rot{opacity:1}
   <p class="bajada">Los caños que hoy están dibujados dejan la red partida en cuatro sistemas sueltos y 21 puntos sin conexión. Acá abajo hay un trazado propuesto: revisalo, aprobá lo que esté bien y rechazá lo que no. Lo que marques se dibuja en el plano.</p>
 
   <div class="cols">
-    <div>
+    <div class="colmapa">
       <div class="plano">
         <div class="lienzo" id="lienzo">
           <div id="svgbox"></div>
