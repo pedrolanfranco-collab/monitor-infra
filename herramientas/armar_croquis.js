@@ -64,7 +64,24 @@ h2{font-size:21px;font-weight:600;letter-spacing:.5px;margin:26px 0 10px;
 @media(min-width:900px){.cols{grid-template-columns:1.05fr .95fr;align-items:start}}
 
 .plano{background:var(--papel2);border:1px solid var(--linea);border-radius:3px;overflow:hidden;position:sticky;top:env(safe-area-inset-top,0px)}
-.plano svg{display:block;width:100%;height:auto}
+.lienzo{position:relative;height:56vh;min-height:320px;touch-action:none;cursor:grab}
+.lienzo.arrastrando{cursor:grabbing}
+.lienzo #svgbox{position:absolute;inset:0}
+.lienzo svg{display:block;width:100%;height:100%}
+.zoombar{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:4px;z-index:2}
+.zoombar button{width:30px;height:30px;border-radius:3px;border:1px solid var(--linea);
+  background:var(--papel);color:var(--tinta);font-family:"Barlow Condensed",sans-serif;
+  font-size:17px;font-weight:700;cursor:pointer;line-height:1;box-shadow:var(--sombra)}
+.zoombar button:hover{border-color:var(--tinta3)}
+.zoombar button:focus-visible{outline:2px solid var(--propuesta);outline-offset:2px}
+.zoombar .chico{font-size:10px;letter-spacing:.3px}
+.ayuda{position:absolute;left:8px;bottom:8px;z-index:2;font-size:11px;color:var(--tinta3);
+  background:var(--papel);border:1px solid var(--linea);border-radius:3px;padding:2px 7px}
+.rot{fill:var(--tinta2);font-family:"Barlow Condensed",sans-serif;font-size:11px;
+  paint-order:stroke;stroke:var(--papel2);stroke-width:3px;stroke-linejoin:round;
+  opacity:0;transition:opacity .15s;pointer-events:none}
+svg.cerca .rot{opacity:1}
+.rot.suelto{fill:var(--propuesta);font-weight:600}
 .leyenda{display:flex;flex-wrap:wrap;gap:4px 14px;padding:9px 12px;border-top:1px solid var(--linea);font-size:12px;color:var(--tinta2)}
 .leyenda span{display:flex;align-items:center;gap:5px}
 .sw{width:15px;height:3px;border-radius:2px;flex:none}
@@ -108,7 +125,15 @@ h2{font-size:21px;font-weight:600;letter-spacing:.5px;margin:26px 0 10px;
   <div class="cols">
     <div>
       <div class="plano">
-        <div id="svgbox"></div>
+        <div class="lienzo" id="lienzo">
+          <div id="svgbox"></div>
+          <div class="zoombar">
+            <button id="z-mas" title="Acercar" aria-label="Acercar">+</button>
+            <button id="z-menos" title="Alejar" aria-label="Alejar">−</button>
+            <button id="z-todo" class="chico" title="Ver todo el campo" aria-label="Ver todo el campo">TODO</button>
+          </div>
+          <div class="ayuda" id="ayuda">Arrastrá para mover · rueda o pellizco para acercar</div>
+        </div>
         <div class="leyenda">
           <span><i class="sw" style="background:var(--s-cerroSur)"></i>Cerro Sur</span>
           <span><i class="sw" style="background:var(--s-cerroNorte)"></i>Cerro Norte</span>
@@ -157,19 +182,59 @@ const H = Math.round((maxLat - minLat) * escala + PAD * 2);
 const X = lon => PAD + (lon - minLon) * K * escala;
 const Y = lat => PAD + (maxLat - lat) * escala;
 
+/* --- vista: el viewBox es la ventana que se mueve sobre el plano --- */
+let vista = { x: 0, y: 0, w: W, h: H };
+const CERCA = W / 3.2;   // a partir de acá se muestran los nombres
+
+function aplicarVista(){
+  const svg = document.querySelector('#svgbox svg');
+  if (!svg) return;
+  svg.setAttribute('viewBox', vista.x.toFixed(1) + ' ' + vista.y.toFixed(1) + ' ' + vista.w.toFixed(1) + ' ' + vista.h.toFixed(1));
+  svg.classList.toggle('cerca', vista.w < CERCA);
+  const a = document.getElementById('ayuda');
+  if (a) a.textContent = vista.w < W - 1
+    ? 'Zoom ' + (W / vista.w).toFixed(1) + '× · arrastrá para mover'
+    : 'Arrastrá para mover · rueda o pellizco para acercar';
+}
+
+function verTodo(){ vista = { x: 0, y: 0, w: W, h: H }; dibujar(); }
+
+function acercar(f, cx, cy){
+  const nw = Math.min(W, Math.max(W / 40, vista.w * f));
+  const k = nw / vista.w;
+  if (cx === undefined) { cx = vista.x + vista.w / 2; cy = vista.y + vista.h / 2; }
+  vista = { x: cx - (cx - vista.x) * k, y: cy - (cy - vista.y) * k, w: nw, h: vista.h * k };
+  dibujar();
+}
+
+/* encuadra un tramo propuesto, con aire alrededor */
+function enfocar(i){
+  const p = D.propuestas[i]; if (!p) return;
+  const a = porId[p.de], b = porId[p.a]; if (!a || !b) return;
+  const x1 = X(a.lon), y1 = Y(a.lat), x2 = X(b.lon), y2 = Y(b.lat);
+  const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+  const w = Math.max(Math.abs(x2 - x1) * 3, Math.abs(y2 - y1) * 3 * W / H, W / 6);
+  vista = { x: cx - w / 2, y: cy - (w * H / W) / 2, w: w, h: w * H / W };
+  dibujar();
+}
+
 function dibujar(){
   const dec = estado;
-  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plano de la red de agua">';
-  s += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="var(--papel2)"/>';
+  /* Los tamanos van en unidades del dibujo, asi que al acercarse crecerian.
+     Escalarlos por k los deja constantes en pantalla a cualquier zoom. */
+  const k = vista.w / W;
+  let s = '<svg viewBox="' + vista.x + ' ' + vista.y + ' ' + vista.w + ' ' + vista.h +
+          '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plano de la red de agua">';
+  s += '<rect x="-2000" y="-2000" width="6000" height="6000" fill="var(--papel2)"/>';
   D.potreros.forEach(p => {
     s += '<polygon points="' + p.c.map(c => X(c[1]).toFixed(1) + ',' + Y(c[0]).toFixed(1)).join(' ') +
-         '" fill="none" stroke="var(--linea)" stroke-width="1"/>';
+         '" fill="none" stroke="var(--linea)" stroke-width="' + (1*k).toFixed(2) + '"/>';
   });
   D.conexiones.forEach(c => {
     const a = porId[c.de], b = porId[c.a]; if (!a || !b) return;
     s += '<line x1="' + X(a.lon).toFixed(1) + '" y1="' + Y(a.lat).toFixed(1) +
          '" x2="' + X(b.lon).toFixed(1) + '" y2="' + Y(b.lat).toFixed(1) +
-         '" stroke="' + (COLOR[a.sistema] || 'var(--tinta3)') + '" stroke-width="2.4" stroke-linecap="round"/>';
+         '" stroke="' + (COLOR[a.sistema] || 'var(--tinta3)') + '" stroke-width="' + (2.4*k).toFixed(2) + '" stroke-linecap="round"/>';
   });
   D.propuestas.forEach((p, i) => {
     const a = porId[p.de], b = porId[p.a]; if (!a || !b) return;
@@ -178,22 +243,91 @@ function dibujar(){
     const col = d === 'si' ? 'var(--ok)' : 'var(--propuesta)';
     s += '<line x1="' + X(a.lon).toFixed(1) + '" y1="' + Y(a.lat).toFixed(1) +
          '" x2="' + X(b.lon).toFixed(1) + '" y2="' + Y(b.lat).toFixed(1) +
-         '" stroke="' + col + '" stroke-width="' + (i === sel ? 4.5 : 2.6) + '"' +
-         (d === 'si' ? '' : ' stroke-dasharray="7 5"') + ' stroke-linecap="round"/>';
+         '" stroke="' + col + '" stroke-width="' + ((i === sel ? 4.5 : 2.6)*k).toFixed(2) + '"' +
+         (d === 'si' ? '' : ' stroke-dasharray="' + (7*k).toFixed(2) + ' ' + (5*k).toFixed(2) + '"') + ' stroke-linecap="round"/>';
   });
   D.elementos.forEach(e => {
-    const r = e.tipo === 'tanque' ? 6 : e.tipo === 'bebedero' ? 4 : 2.6;
+    const r = (e.tipo === 'tanque' ? 6 : e.tipo === 'bebedero' ? 4 : 2.6) * k;
     const f = e.tipo === 'tanque' ? (COLOR[e.sistema] || 'var(--tinta2)')
             : e.suelto ? 'var(--propuesta)' : (COLOR[e.sistema] || 'var(--tinta3)');
-    s += '<circle cx="' + X(e.lon).toFixed(1) + '" cy="' + Y(e.lat).toFixed(1) + '" r="' + r +
-         '" fill="' + f + '" stroke="var(--papel2)" stroke-width="1"/>';
+    s += '<circle cx="' + X(e.lon).toFixed(1) + '" cy="' + Y(e.lat).toFixed(1) + '" r="' + r.toFixed(2) +
+         '" fill="' + f + '" stroke="var(--papel2)" stroke-width="' + (1*k).toFixed(2) + '"/>';
   });
-  D.elementos.filter(e => e.tipo === 'tanque').forEach(e => {
-    s += '<text class="pt" x="' + (X(e.lon) + 9).toFixed(1) + '" y="' + (Y(e.lat) + 3).toFixed(1) + '">' +
-         e.nombre.replace('Tanque ', '') + ' · ' + e.cota + ' m</text>';
+  /* nombres: los tanques siempre; el resto al acercar */
+  D.elementos.forEach(e => {
+    const esTanque = e.tipo === 'tanque';
+    const txt = esTanque ? e.nombre.replace('Tanque ', '') + ' · ' + e.cota + ' m' : e.nombre;
+    s += '<text class="' + (esTanque ? 'pt' : 'rot' + (e.suelto ? ' suelto' : '')) + '" x="' +
+         (X(e.lon) + 7*k).toFixed(1) + '" y="' + (Y(e.lat) + 3.5*k).toFixed(1) +
+         '" font-size="' + ((esTanque ? 9.5 : 11) * k).toFixed(2) + '" stroke-width="' + (3*k).toFixed(2) + '">' +
+         txt.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</text>';
   });
   s += '</svg>';
   document.getElementById('svgbox').innerHTML = s;
+  aplicarVista();
+}
+
+/* --- arrastrar, rueda y pellizco --- */
+function instalarGestos(){
+  const box = document.getElementById('lienzo');
+  const aPlano = ev => {
+    const r = box.getBoundingClientRect();
+    const esc = Math.max(vista.w / r.width, vista.h / r.height);   // por el letterboxing
+    return {
+      x: vista.x + vista.w / 2 + (ev.clientX - (r.left + r.width / 2)) * esc,
+      y: vista.y + vista.h / 2 + (ev.clientY - (r.top + r.height / 2)) * esc,
+      esc,
+    };
+  };
+  let arr = null, pellizco = null;
+
+  box.addEventListener('pointerdown', ev => {
+    if (ev.target.closest('.zoombar')) return;
+    box.setPointerCapture(ev.pointerId);
+    arr = { id: ev.pointerId, px: ev.clientX, py: ev.clientY, vx: vista.x, vy: vista.y };
+    box.classList.add('arrastrando');
+  });
+  box.addEventListener('pointermove', ev => {
+    if (!arr || ev.pointerId !== arr.id || pellizco) return;
+    const r = box.getBoundingClientRect();
+    const esc = Math.max(vista.w / r.width, vista.h / r.height);
+    vista.x = arr.vx - (ev.clientX - arr.px) * esc;
+    vista.y = arr.vy - (ev.clientY - arr.py) * esc;
+    aplicarVista();
+  });
+  const soltar = ev => { if (arr && ev.pointerId === arr.id) { arr = null; box.classList.remove('arrastrando'); } };
+  box.addEventListener('pointerup', soltar);
+  box.addEventListener('pointercancel', soltar);
+
+  box.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    const p = aPlano(ev);
+    acercar(ev.deltaY > 0 ? 1.18 : 1 / 1.18, p.x, p.y);
+  }, { passive: false });
+
+  /* pellizco con dos dedos */
+  const dedos = new Map();
+  box.addEventListener('pointerdown', ev => { dedos.set(ev.pointerId, ev); });
+  box.addEventListener('pointermove', ev => {
+    if (!dedos.has(ev.pointerId)) return;
+    dedos.set(ev.pointerId, ev);
+    if (dedos.size !== 2) return;
+    arr = null;
+    const [a, b] = [...dedos.values()];
+    const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if (pellizco) {
+      const p = aPlano({ clientX: (a.clientX + b.clientX) / 2, clientY: (a.clientY + b.clientY) / 2 });
+      acercar(pellizco / d, p.x, p.y);
+    }
+    pellizco = d;
+  });
+  const quitar = ev => { dedos.delete(ev.pointerId); if (dedos.size < 2) pellizco = null; };
+  box.addEventListener('pointerup', quitar);
+  box.addEventListener('pointercancel', quitar);
+
+  document.getElementById('z-mas').addEventListener('click', () => acercar(1 / 1.5));
+  document.getElementById('z-menos').addEventListener('click', () => acercar(1.5));
+  document.getElementById('z-todo').addEventListener('click', verTodo);
 }
 
 /* --- propuestas dudosas: vale la pena que las mire dos veces --- */
@@ -225,7 +359,7 @@ function render(){
         '</div>';
       div.addEventListener('click', ev => {
         if (ev.target.tagName === 'BUTTON') return;
-        sel = sel === i ? null : i; render(); dibujar();
+        sel = sel === i ? null : i; render(); dibujar(); if (sel !== null) enfocar(sel);
       });
       cont.appendChild(div);
     });
@@ -234,7 +368,7 @@ function render(){
     const i = +b.dataset.i, v = b.dataset.v;
     estado[i] = estado[i] === v ? undefined : v;
     if (estado[i] === undefined) delete estado[i];
-    sel = i; render(); dibujar();
+    sel = i; render(); dibujar(); enfocar(i);
   }));
   contar();
 }
@@ -258,6 +392,7 @@ function contar(){
 
 render();
 dibujar();
+instalarGestos();
 </script>`;
 
 const salida = process.argv[2] || path.join(__dirname, 'croquis.html');
