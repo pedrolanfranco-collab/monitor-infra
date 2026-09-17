@@ -128,6 +128,31 @@ origen.
 
 ---
 
+## Para seguir en otra sesión
+
+**El croquis ya existe. Para modificarlo hay que actualizar ESE artifact, no
+publicar uno nuevo.**
+
+- URL: `https://claude.ai/artifact/UDeCqyxJi4s7MWtVSnAi4i`
+- Generador: `herramientas/armar_croquis.js` (lee `croquis_datos.json`, que
+  produce `herramientas/proponer_trazado.js`)
+
+Para regenerarlo y republicarlo desde una sesión nueva:
+
+```bash
+node herramientas/proponer_trazado.js      # recalcula las propuestas
+node herramientas/armar_croquis.js <salida.html>
+```
+
+y después publicar **pasando `url`** con esa dirección. Sin el `url`, se crea un
+artifact separado y Pedro se queda con dos.
+
+**Ojo**: las decisiones que Pedro ya haya tomado viven en el `localStorage` de
+su navegador bajo la clave `croquis_red_agua_v1`. Republicar a la misma URL
+**no** las borra. Cambiar el orden o la cantidad de propuestas **sí** las
+desalinea, porque se guardan por índice — si hay que regenerar las propuestas,
+pedirle antes que copie el resumen.
+
 ## Relación con las apps de potreros
 
 Las dos apps modelan **los mismos objetos físicos por duplicado**: 35 puntos con
