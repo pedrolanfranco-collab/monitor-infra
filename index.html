@@ -291,7 +291,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.0 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.1 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -465,6 +465,7 @@ body{display:flex;flex-direction:column}
           <button class="cb cp" onclick="startAddMode()">📍 Agregar tocando el mapa</button>
           <button class="cb" onclick="showAdd(null)">+ Nuevo elemento manual</button>
           <button class="cb" onclick="startConn()">🔗 Conectar dos elementos</button>
+          <button class="cb cp" onclick="showPendientes()">🧩 Conexiones pendientes (<span id="cfg-pend">0</span>)</button>
         </div>
         <div class="cs"><h4>📦 Elementos (<span id="cfg-ec">0</span>)</h4><div id="cfg-el"><div style="font-size:11px;color:var(--txt3)">Sin elementos</div></div></div>
         <div class="cs">
@@ -723,6 +724,18 @@ body{display:flex;flex-direction:column}
   </div>
 </div>
 
+<!-- MODAL: Conexiones pendientes — conectar sin depender del mapa -->
+<div class="modal" id="m-pend">
+  <div class="mbox" style="max-width:460px">
+    <h2 id="pend-title">CONEXIONES PENDIENTES</h2>
+    <p id="pend-sub" style="font-size:11px;color:var(--txt2);margin-bottom:8px"></p>
+    <div id="pend-lista" style="max-height:48vh;overflow:auto"></div>
+    <div class="mac">
+      <button class="m-cn" onclick="closeM('m-pend')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- SRI en Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   crossorigin="anonymous"></script>
@@ -760,6 +773,9 @@ var T={
   distribuidor_x:{ico:'✚',lbl:'Dist Cruz',net:'agua',valve:true},
   bebedero:{ico:'🐄',lbl:'Bebedero',net:'agua'},
   potrero:{ico:'🌿',lbl:'Potrero',net:'both'},
+  // Uniones, pasos de zanja y demás accesorios de cañería. Sin `valve`: el agua
+  // los atraviesa. Estaban fuera de esta tabla y por eso no se dibujaban.
+  sin_clasificar:{ico:'🔩',lbl:'Unión / Accesorio',net:'agua'},
 };
 var JUNC=['distribuidor_t','distribuidor_x','llave_t','llave_x'];
 var SIST_T=['energizador','llave_elec','bomba','llave_agua','bomba_solar','tanque','bebedero','llave_t','llave_x','distribuidor_t','distribuidor_x'];
@@ -769,7 +785,7 @@ var MS={
   bomba_solar:{r:8,c:'#aed581'},tanque:{r:10,c:'#1565c0'},
   llave_agua:{r:7,c:'#42a5f5'},llave_t:{r:7,c:'#80cbc4'},llave_x:{r:7,c:'#80cbc4'},
   distribuidor_t:{r:8,c:'#80cbc4'},distribuidor_x:{r:8,c:'#80cbc4'},
-  bebedero:{r:7,c:'#26c6da'},potrero:{r:10,c:'#4caf50'},
+  bebedero:{r:7,c:'#26c6da'},potrero:{r:10,c:'#4caf50'},sin_clasificar:{r:6,c:'#9e9e9e'},
 };
 
 // ── STATE ──────────────────────────────────────────────────
@@ -1320,6 +1336,7 @@ function addHist(u,a,r){S.hist.unshift({id:uid(),user:u,action:a,result:r||'',ts
 function renderCfg(){
   document.getElementById('cfg-ec').textContent=Object.keys(S.elems).length;
   document.getElementById('cfg-cc').textContent=S.conns.length;
+  contarPendientes();
   const el=document.getElementById('cfg-el');
   const items=Object.values(S.elems).sort((a,b)=>a.name.localeCompare(b.name,'es'));
   if(!items.length){el.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';return;}
@@ -1587,6 +1604,123 @@ function handleConn(id){
     addHist('Config',`Conectó "${a.name}" ↔ "${b.name}"`,`Red: ${net}`);
   }
   connFirst=null;setBanner('Modo conexión — tocá el primer elemento');renderAll();renderCfg();save();
+}
+
+// ── CONEXIONES PENDIENTES ──────────────────────────────────
+// Conectar desde una lista en vez del mapa: hay elementos apilados en la misma
+// coordenada y otros que son un pin diminuto, y así son imposibles de tocar.
+
+function metrosEntre(a,b){
+  if(!a.geom||!b.geom||a.geom.type!=='Point'||b.geom.type!=='Point')return Infinity;
+  const dy=(a.geom.lat-b.geom.lat)*111000, dx=(a.geom.lng-b.geom.lng)*95000;
+  return Math.sqrt(dy*dy+dx*dx);
+}
+
+// Elementos a los que el agua no puede llegar desde ningún tanque, ignorando
+// si las llaves están abiertas: lo que falta acá es el caño, no la maniobra.
+function alcanzablesDesdeTanques(){
+  const adj={};
+  Object.keys(S.elems).forEach(id=>{adj[id]=[];});
+  S.conns.forEach(c=>{ if(adj[c.from])adj[c.from].push(c.to); if(adj[c.to])adj[c.to].push(c.from); });
+  const q=Object.values(S.elems).filter(e=>e.type==='tanque').map(e=>e.id);
+  const vis=new Set(q);
+  while(q.length){ const x=q.shift(); (adj[x]||[]).forEach(y=>{ if(!vis.has(y)){vis.add(y);q.push(y);} }); }
+  return vis;
+}
+
+function elementosPendientes(){
+  const alc=alcanzablesDesdeTanques();
+  const orden={bebedero:0,tanque:1,bomba:2,bomba_solar:2};
+  return Object.values(S.elems)
+    .filter(e=>e.geom&&e.geom.type==='Point'&&!alc.has(e.id))
+    .sort((a,b)=>(orden[a.type]??9)-(orden[b.type]??9)||a.name.localeCompare(b.name,'es'));
+}
+
+function contarPendientes(){
+  const n=elementosPendientes().length;
+  const el=document.getElementById('cfg-pend');
+  if(el)el.textContent=n;
+  return n;
+}
+
+function showPendientes(){
+  exitAll();
+  document.getElementById('m-pend').classList.add('on');
+  renderPendientes();
+}
+
+function renderPendientes(){
+  const pend=elementosPendientes();
+  const alc=alcanzablesDesdeTanques();
+  document.getElementById('pend-sub').textContent = pend.length
+    ? pend.length+' elemento(s) sin ningún caño que los una a un tanque. Elegí uno y te muestro los más cercanos.'
+    : 'Todos los elementos llegan a un tanque.';
+  const wrap=document.getElementById('pend-lista');
+  if(!pend.length){ wrap.innerHTML='<div class="es"><div class="bi">✅</div>No queda nada pendiente.</div>'; return; }
+  wrap.innerHTML=pend.map(e=>{
+    const ti=T[e.type]||{ico:'•',lbl:e.type};
+    const n=S.conns.filter(c=>c.from===e.id||c.to===e.id).length;
+    const est=n?`${n} conexión(es), pero ninguna llega a un tanque`:'sin ninguna conexión';
+    return `<div class="pc" style="margin-bottom:5px">
+      <div class="pc-top">
+        <span class="pc-n">${ti.ico} ${e.name}</span>
+        <button class="cb" data-pend="${e.id}" style="width:auto;padding:2px 10px;margin:0">Conectar</button>
+      </div>
+      <div style="font-size:10px;color:var(--txt3)">${ti.lbl} · ${est}${e.cota!=null?' · '+e.cota+' m':''}</div>
+    </div>`;
+  }).join('');
+  wrap.querySelectorAll('[data-pend]').forEach(b=>
+    b.addEventListener('click',()=>elegirVecino(b.getAttribute('data-pend'))));
+}
+
+function elegirVecino(id){
+  const e=S.elems[id]; if(!e)return;
+  const alc=alcanzablesDesdeTanques();
+  const yaConectado=new Set(S.conns.filter(c=>c.from===id||c.to===id).map(c=>c.from===id?c.to:c.from));
+  const cand=Object.values(S.elems)
+    .filter(o=>o.id!==id&&o.geom&&o.geom.type==='Point'&&o.type!=='potrero'&&!yaConectado.has(o.id))
+    .map(o=>({o,d:metrosEntre(e,o),llega:alc.has(o.id)}))
+    .sort((a,b)=>(b.llega-a.llega)||(a.d-b.d))
+    .slice(0,12);
+  const ti=T[e.type]||{ico:'•'};
+  document.getElementById('pend-title').textContent='CONECTAR '+e.name.toUpperCase();
+  document.getElementById('pend-sub').innerHTML=
+    `${ti.ico} <b>${e.name}</b> — elegí con qué se une. Los marcados con 💧 ya reciben agua de un tanque.`;
+  document.getElementById('pend-lista').innerHTML=cand.map(c=>{
+    const t2=T[c.o.type]||{ico:'•',lbl:c.o.type};
+    return `<div class="pc" style="margin-bottom:5px">
+      <div class="pc-top">
+        <span class="pc-n">${c.llega?'💧 ':''}${t2.ico} ${c.o.name}</span>
+        <button class="cb" data-con="${c.o.id}" style="width:auto;padding:2px 10px;margin:0">Unir</button>
+      </div>
+      <div style="font-size:10px;color:var(--txt3)">${t2.lbl} · a ${c.d<1?'menos de 1':Math.round(c.d)} m${c.o.cota!=null?' · '+c.o.cota+' m':''}</div>
+    </div>`;
+  }).join('')+`<button class="cb" id="pend-volver" style="margin-top:8px">← Volver a la lista</button>`;
+  document.getElementById('pend-lista').querySelectorAll('[data-con]').forEach(b=>
+    b.addEventListener('click',()=>conectarPendiente(id,b.getAttribute('data-con'))));
+  document.getElementById('pend-volver').addEventListener('click',()=>{
+    document.getElementById('pend-title').textContent='CONEXIONES PENDIENTES';
+    renderPendientes();
+  });
+}
+
+function conectarPendiente(aId,bId){
+  const a=S.elems[aId], b=S.elems[bId];
+  if(!a||!b)return;
+  if(!S.conns.find(c=>(c.from===aId&&c.to===bId)||(c.from===bId&&c.to===aId))){
+    const wt=['tanque','llave_agua','bebedero','bomba_solar','llave_t','llave_x','distribuidor_t','distribuidor_x','sin_clasificar'];
+    let net='elec';
+    if(wt.includes(a.type)||wt.includes(b.type))net='agua';
+    if(a.type==='potrero'||b.type==='potrero')net='both';
+    S.conns.push({id:uid(),from:aId,to:bId,net});
+    addHist('Config',`Conectó "${a.name}" ↔ "${b.name}"`,`Red: ${net}`);
+    save();
+  }
+  renderAll();renderCfg();
+  const quedan=contarPendientes();
+  showToast('🔗','Conectado',`"${a.name}" ↔ "${b.name}". Quedan ${quedan} pendiente(s).`);
+  document.getElementById('pend-title').textContent='CONEXIONES PENDIENTES';
+  renderPendientes();
 }
 
 // ── DRAW ───────────────────────────────────────────────────
