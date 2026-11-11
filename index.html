@@ -153,6 +153,41 @@ body{display:flex;flex-direction:column}
 #btn-gps{top:10px;left:220px}
 #btn-lock{top:10px;right:10px}
 #btn-lock.trabado{background:var(--surf3);color:var(--amber);border-color:var(--amber)}
+/* CÓDIGOS DE PIEZAS: botones del mapa, etiqueta bajo cada marcador, buscador, guía y lista para imprimir */
+/* segunda fila, a la derecha del zoom de Leaflet (que ocupa los primeros 44px de la izquierda) */
+#btn-cod{top:44px;left:54px}
+#btn-guia{top:44px;left:150px}
+.cod-lbl{position:absolute;transform:translate(-50%,9px);font-family:var(--mono);font-size:9px;font-weight:700;color:#fff;white-space:nowrap;pointer-events:none;text-shadow:0 0 3px #000,0 0 3px #000,0 0 6px #000;letter-spacing:.2px}
+#map.cod-off .cod-lbl,#map.cod-lejos .cod-lbl{display:none}
+.q-in{width:100%;padding:7px 10px;background:var(--surf2);border:1px solid var(--brd2);border-radius:4px;color:var(--txt);font-family:var(--sans);font-size:12px;outline:none}
+.q-in:focus{border-color:var(--green2)}
+#buscar-box{padding:6px 8px;border-bottom:1px solid var(--brd)}
+#buscar-res{margin-top:4px}
+#buscar-res:empty{display:none}
+.cod-tag{font-family:var(--mono);font-weight:700;color:var(--green2)}
+.cod-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--brd);font-size:11px}
+.cod-row input{width:128px;flex-shrink:0;font-family:var(--mono);font-size:12px;padding:5px 6px}
+.cod-row .cod-info{flex:1;min-width:0}
+.cod-row .cod-info small{display:block;color:var(--txt3);font-size:9px}
+.guia-t{width:100%;border-collapse:collapse;font-size:11px;margin:4px 0 8px}
+.guia-t td{padding:3px 6px;border-bottom:1px solid var(--brd);vertical-align:top}
+.guia-t td:first-child{font-family:var(--mono);font-weight:700;color:var(--green2);white-space:nowrap}
+.guia-h{font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--green2);margin:8px 0 2px}
+.guia-p{font-size:11px;color:var(--txt2);line-height:1.35}
+#print-area{display:none}
+@media print{
+  html,body{height:auto!important;overflow:visible!important;background:#fff!important}
+  body.printing>*:not(#print-area){display:none!important}
+  body.printing #print-area{display:block;color:#000;background:#fff;font-family:Arial,Helvetica,sans-serif;font-size:10.5px;padding:6px}
+  #print-area h1{font-size:16px;margin:0 0 2px}
+  #print-area h2{font-size:12px;margin:10px 0 3px}
+  #print-area p{margin:2px 0}
+  #print-area table{width:100%;border-collapse:collapse;margin:3px 0 8px}
+  #print-area th,#print-area td{border:1px solid #777;padding:2px 5px;text-align:left;vertical-align:top}
+  #print-area th{background:#ddd}
+  #print-area td.c{font-family:"Courier New",monospace;font-weight:700;white-space:nowrap}
+  #print-area tr{page-break-inside:avoid}
+}
 #banner{position:absolute;bottom:0;left:0;right:0;z-index:600;padding:8px 14px;font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:.5px;display:none;transition:all .3s}
 
 /* GPS INFO */
@@ -293,7 +328,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.5 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.6 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -317,6 +352,8 @@ body{display:flex;flex-direction:column}
     <button class="map-btn" id="btn-draw" onclick="startDraw()">✏️ Dibujar</button>
     <button class="map-btn" id="btn-gps" onclick="togGPS()">📍 Mi ubicación</button>
     <button class="map-btn" id="btn-lock" onclick="togTrabaMapa()" title="Trabar el mapa para que no se corra sin querer">🔒</button>
+    <button class="map-btn" id="btn-cod" onclick="togCodLbl()" title="Mostrar u ocultar el código de cada pieza (se ven al acercar el mapa)">🏷 Códigos</button>
+    <button class="map-btn" id="btn-guia" onclick="showGuia()" title="Qué significa cada código">📖 Guía</button>
     <div id="gps-info"></div>
     <div id="legend">
       <div id="legend-hdr" onpointerdown="legendDragStart(event)"><span class="lg-grip">⠿</span> Referencias <span class="lg-arrow" id="legend-arrow">▾</span></div>
@@ -346,6 +383,12 @@ body{display:flex;flex-direction:column}
     <div class="pv on" id="pv-mapa">
       <div class="ph">ESTADO GENERAL</div>
       <div style="overflow-y:auto;flex:1;min-height:0">
+
+        <!-- Buscador de piezas por código o nombre: tocar un resultado lo muestra en el mapa -->
+        <div id="buscar-box">
+          <input class="q-in" id="buscar-q" type="search" placeholder="🔎 Buscar pieza por código o nombre" oninput="renderBuscar()" autocomplete="off">
+          <div id="buscar-res"></div>
+        </div>
 
         <!-- SECCIÓN: Resumen numérico -->
         <div class="sec sec-estado" id="sec-estado">
@@ -488,7 +531,14 @@ body{display:flex;flex-direction:column}
           <button class="cb" onclick="startConn()">🔗 Conectar dos elementos</button>
           <button class="cb cp" onclick="showPendientes()">🧩 Conexiones pendientes (<span id="cfg-pend">0</span>)</button>
         </div>
-        <div class="cs"><h4>📦 Elementos (<span id="cfg-ec">0</span>)</h4><div id="cfg-el"><div style="font-size:11px;color:var(--txt3)">Sin elementos</div></div></div>
+        <div class="cs"><h4>🏷 Códigos de las piezas</h4>
+          <button class="cb cp" onclick="showAdjudicar()">🏷 Adjudicar códigos (<span id="cfg-sincod">0</span> sin código)</button>
+          <button class="cb" onclick="showGuia()">📖 Guía de códigos</button>
+          <button class="cb" onclick="imprimirPiezas()">🖨 Lista de piezas para imprimir</button>
+        </div>
+        <div class="cs"><h4>📦 Elementos (<span id="cfg-ec">0</span>)</h4>
+          <input class="q-in" id="cfg-q" type="search" placeholder="🔎 Filtrar por código o nombre" oninput="renderCfg()" autocomplete="off" style="margin-bottom:6px">
+          <div id="cfg-el"><div style="font-size:11px;color:var(--txt3)">Sin elementos</div></div></div>
         <div class="cs">
           <h4>🔗 Conexiones (<span id="cfg-cc">0</span>)
             <button onclick="askDelAllConns()" style="float:right;background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">[borrar todas]</button>
@@ -526,7 +576,13 @@ body{display:flex;flex-direction:column}
   <div class="mbox">
     <h2 id="me-title">NUEVO ELEMENTO</h2>
     <input type="hidden" id="me-id">
-    <label>Nombre</label>
+    <label>Código <span style="font-size:9px;color:var(--txt3);text-transform:none;letter-spacing:0">— no se repite · <a href="#" onclick="showGuia();return false" style="color:var(--green2)">📖 ver guía</a></span></label>
+    <div style="display:flex;gap:4px;align-items:center">
+      <input id="me-cod" type="text" maxlength="30" placeholder="Ej: L2-03" style="flex:1;font-family:var(--mono)" oninput="codManual=true;updateCodHint()" autocomplete="off">
+      <button onclick="sugerirEnForm(true)" title="Sugerir el código según el tipo y el lugar en el mapa" style="background:var(--surf2);border:1px solid var(--green);color:var(--green2);border-radius:4px;padding:6px 8px;cursor:pointer;font-size:11px;flex-shrink:0;font-family:var(--cond)">🏷 Sugerir</button>
+    </div>
+    <div id="me-cod-hint" style="font-size:10px;color:var(--txt2);margin-top:3px;line-height:1.3"></div>
+    <label>Nombre o descripción <span style="font-size:9px;color:var(--txt3);text-transform:none;letter-spacing:0">— opcional si tiene código</span></label>
     <div style="display:flex;gap:4px;align-items:center">
       <input id="me-name" type="text" placeholder="Ej: Llave Norte" style="flex:1">
       <button onclick="document.getElementById('me-name').value='';document.getElementById('me-name').focus();" title="Borrar nombre" style="background:var(--surf2);border:1px solid var(--brd2);color:var(--txt2);border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0">✕</button>
@@ -549,6 +605,7 @@ body{display:flex;flex-direction:column}
         <option value="distribuidor_t">⊤ Distribución T</option>
         <option value="distribuidor_x">✚ Distribución Cruz</option>
         <option value="valvula_retencion">⏩ Válvula de retención</option>
+        <option value="sin_clasificar">🔩 Unión / Paso de zanja</option>
         <option value="bebedero">🐄 Bebedero</option>
       </optgroup>
       <optgroup label="─ General ─">
@@ -556,7 +613,7 @@ body{display:flex;flex-direction:column}
       </optgroup>
     </select>
     <div id="me-sist-row"><label>Sistema</label>
-      <select id="me-sist">
+      <select id="me-sist" onchange="sugerirEnForm(false)">
         <option value="1">Sistema 1</option><option value="2">Sistema 2</option>
         <option value="3">Sistema 3</option><option value="4">Sistema 4</option>
       </select>
@@ -754,10 +811,65 @@ body{display:flex;flex-direction:column}
     <p id="pend-sub" style="font-size:11px;color:var(--txt2);margin-bottom:8px"></p>
     <div id="pend-lista" style="max-height:48vh;overflow:auto"></div>
     <div class="mac">
+      <button class="m-cn" onclick="showGuia()">📖 Guía de códigos</button>
       <button class="m-cn" onclick="closeM('m-pend')">Cerrar</button>
     </div>
   </div>
 </div>
+
+<!-- MODAL: Adjudicar códigos a las piezas que todavía no tienen -->
+<div class="modal" id="m-cod">
+  <div class="mbox" style="max-width:520px">
+    <h2>🏷 ADJUDICAR CÓDIGOS</h2>
+    <p id="cod-sub" style="font-size:11px;color:var(--txt2);margin-bottom:8px"></p>
+    <div id="cod-lista" style="max-height:52vh;overflow:auto"></div>
+    <div class="mac">
+      <button class="m-cn" onclick="closeM('m-cod')">Cancelar</button>
+      <button class="m-cn" onclick="showGuia()">📖 Guía</button>
+      <button class="m-ok" onclick="aceptarCodigos()" style="flex:1">✔ Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Guía de códigos (va última: se abre encima de las otras ventanas) -->
+<div class="modal" id="m-guia">
+  <div class="mbox" style="max-width:440px">
+    <h2>📖 GUÍA DE CÓDIGOS</h2>
+    <div style="max-height:62vh;overflow:auto">
+      <div class="guia-p">Cada pieza tiene un código que <b>no se repite</b>. Hay dos reglas.</div>
+      <div class="guia-h">1 · LO QUE DA AGUA A UN POTRERO</div>
+      <div class="guia-p">Lleva el nombre del potrero.</div>
+      <table class="guia-t">
+        <tr><td>B 12</td><td>Bebedero del potrero 12</td></tr>
+        <tr><td>LB 12</td><td>Llave de ese bebedero</td></tr>
+        <tr><td>B 15-18</td><td>Bebedero en el alambrado entre el 15 y el 18</td></tr>
+        <tr><td>B 12b</td><td>Segundo bebedero del potrero 12</td></tr>
+      </table>
+      <div class="guia-h">2 · LO QUE ESTÁ EN EL CAÑO PRINCIPAL</div>
+      <div class="guia-p">Letra = qué es. Primer número = sistema. Segundo número = orden saliendo del tanque.<br>Ejemplo: <span class="cod-tag">L2-03</span> = llave de corte · sistema 2 · la tercera.</div>
+      <table class="guia-t">
+        <tr><td>L</td><td>Llave de corte</td></tr>
+        <tr><td>TL</td><td>T con llave</td></tr>
+        <tr><td>T</td><td>T sin llave</td></tr>
+        <tr><td>XL</td><td>Cruz con llave</td></tr>
+        <tr><td>X</td><td>Cruz sin llave</td></tr>
+        <tr><td>U</td><td>Unión o paso de zanja</td></tr>
+        <tr><td>VR</td><td>Válvula de retención (un solo sentido)</td></tr>
+        <tr><td>TQ</td><td>Tanque (TQ1, TQ2, TQ3, TQ4)</td></tr>
+        <tr><td>BS · BE</td><td>Bomba solar · Bomba eléctrica</td></tr>
+      </table>
+      <div class="guia-h">LOS SISTEMAS</div>
+      <table class="guia-t" id="guia-sis"></table>
+      <div class="guia-p">Un código puesto no cambia más. Una pieza nueva toma el número libre que sigue.</div>
+    </div>
+    <div class="mac">
+      <button class="m-ok" onclick="closeM('m-guia')" style="flex:1">✔ Entendido</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lista de piezas para imprimir (solo se ve al imprimir) -->
+<div id="print-area"></div>
 
 <!-- SRI en Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -904,6 +1016,7 @@ function load(){
     if(d.elems)Object.assign(S.elems,d.elems);
     if(d.conns)S.conns.push(...d.conns);
     if(d.hist)S.hist.push(...d.hist);
+    limpiarCods();
   }catch(e){console.warn('load error',e);}
 }
 
@@ -1112,6 +1225,243 @@ function calcStates(){
   return{energized:energized,watered:watered};
 }
 
+// ── CÓDIGOS DE PIEZAS ──────────────────────────────────────
+// Cada pieza lleva un código corto que no se repite (campo `cod`). Dos reglas:
+//  1. Lo que da agua a un potrero lleva el nombre del potrero:
+//     B 12 (bebedero), LB 12 (su llave), B 15-18 (en el alambrado entre dos).
+//  2. Lo que está en el caño principal: letra + sistema + número de orden
+//     saliendo del tanque: L2-03, TL2-04, U1-05.
+// Un código adjudicado no cambia más; una pieza nueva toma el número libre
+// siguiente. Estas funciones no tocan el DOM (las prueba
+// herramientas/probar_codigos.js sacándolas de este archivo).
+var COD_LETRA={bebedero:'B',llave_agua:'L',llave_t:'TL',llave_x:'XL',distribuidor_t:'T',distribuidor_x:'X',sin_clasificar:'U',valvula_retencion:'VR',llave_elec:'LE',energizador:'EN',poste_t:'PT',poste_x:'PX'};
+var COD_DESC={B:'Bebedero',LB:'Llave del bebedero',L:'Llave de corte',TL:'T con llave',T:'T sin llave',XL:'Cruz con llave',X:'Cruz sin llave',U:'Unión o paso de zanja',VR:'Válvula de retención',TQ:'Tanque',BS:'Bomba solar',BE:'Bomba eléctrica',LE:'Llave eléctrica',EN:'Energizador',PT:'Poste T',PX:'Poste cruz'};
+var COD_CERCA_ALAMBRADO=10; // metros: un bebedero a menos de esto de un alambrado es de los dos potreros
+var COD_CERCA_BEBEDERO=10;  // metros: una llave suelta a menos de esto de un bebedero es su llave
+
+function codNorm(c){return String(c==null?'':c).replace(/[<>&"'`]/g,'').replace(/\s+/g,' ').trim();}
+
+// Los códigos que llegan de afuera (localStorage, un JSON importado) no pasaron
+// por el formulario: se limpian igual, porque después van a la pantalla.
+function limpiarCods(){
+  Object.values(S.elems).forEach(function(e){
+    if(e&&e.cod!=null){var c=codNorm(e.cod);e.cod=c||null;}
+  });
+}
+
+// Códigos ya tomados (en minúscula) -> id de la pieza que lo tiene
+function codUsados(exceptId){
+  var u={};
+  Object.values(S.elems).forEach(function(e){if(e.cod&&e.id!==exceptId)u[String(e.cod).toLowerCase()]=e.id;});
+  return u;
+}
+
+// Texto para mostrar una pieza: el código adelante y el nombre viejo detrás.
+function etq(e){
+  if(!e)return '?';
+  if(!e.cod)return e.name||'?';
+  if(!e.name||e.name===e.cod)return e.cod;
+  return e.cod+' · '+(e.antes===e.name?'antes ':'')+e.name;
+}
+
+// De qué tanque cuelga cada pieza, siguiendo los caños dibujados (sin mirar
+// si las llaves están abiertas): {id:{sis,salto,tanque}}
+function codRed(){
+  var adj={};
+  Object.keys(S.elems).forEach(function(i){adj[i]=[];});
+  S.conns.forEach(function(c){if(adj[c.from]&&adj[c.to]){adj[c.from].push(c.to);adj[c.to].push(c.from);}});
+  var tanques=Object.values(S.elems).filter(function(e){return e.type==='tanque';})
+    .sort(function(a,b){return (a.sistema||9)-(b.sistema||9);});
+  var info={},q=[];
+  tanques.forEach(function(t){info[t.id]={sis:t.sistema||1,salto:0,tanque:t};q.push(t.id);});
+  while(q.length){
+    var x=q.shift();
+    adj[x].forEach(function(y){
+      if(info[y])return;
+      var el=S.elems[y];if(!el||el.type==='potrero')return;
+      info[y]={sis:info[x].sis,salto:info[x].salto+1,tanque:info[x].tanque};
+      q.push(y);
+    });
+  }
+  return info;
+}
+
+// Sistema de una pieza: el del tanque que la alimenta; si no tiene caño, el de
+// la pieza con caño más cercana (hasta 150 m); si no hay, el que tiene cargado.
+function codSistemaDe(el,red){
+  if(el.id&&red[el.id])return red[el.id].sis;
+  if(el.geom&&el.geom.type==='Point'){
+    var best=null,bd=150;
+    Object.values(S.elems).forEach(function(o){
+      if(o.id===el.id||!red[o.id]||!o.geom||o.geom.type!=='Point')return;
+      var d=metrosEntre(el,o);
+      if(d<bd){bd=d;best=o;}
+    });
+    if(best)return red[best.id].sis;
+  }
+  return el.sistema||1;
+}
+
+// Nombres de los potreros de un punto: el que lo contiene y los que tienen un
+// alambrado a pocos metros (un bebedero en el alambrado sirve a los dos).
+function codPotrerosDe(lat,lng){
+  var r=[];
+  Object.values(S.elems).forEach(function(p){
+    if(p.type!=='potrero'||!p.geom||p.geom.type!=='Polygon'||!p.geom.coords||p.geom.coords.length<3)return;
+    var c=p.geom.coords,d=Infinity;
+    for(var i=0;i<c.length;i++){
+      var a=c[i],b=c[(i+1)%c.length];
+      d=Math.min(d,distPtoSeg(lat,lng,a[0],a[1],b[0],b[1]));
+    }
+    r.push({name:p.name,dentro:ptInPoly(lat,lng,c),d:d});
+  });
+  var cerca=r.filter(function(x){return x.dentro||x.d<=COD_CERCA_ALAMBRADO;});
+  if(!cerca.length){
+    r.sort(function(a,b){return a.d-b.d;});
+    if(r.length&&r[0].d<=60)cerca=[r[0]];
+  }
+  cerca.sort(function(a,b){return (b.dentro-a.dentro)||(a.d-b.d);});
+  return cerca.slice(0,3).map(function(x){return codNorm(x.name);}).filter(Boolean)
+    .sort(function(a,b){return a.localeCompare(b,'es',{numeric:true});});
+}
+
+// El bebedero de una llave: el único bebedero unido a ella por un caño; si la
+// llave está suelta, el bebedero que tiene pegado.
+function codBebederoDe(el){
+  var vec=[];
+  if(el.id)S.conns.forEach(function(c){
+    if(c.from!==el.id&&c.to!==el.id)return;
+    var o=S.elems[c.from===el.id?c.to:c.from];
+    if(o)vec.push(o);
+  });
+  if(vec.length){
+    var bs=vec.filter(function(o){return o.type==='bebedero';});
+    return bs.length===1?bs[0]:null;
+  }
+  if(!el.geom||el.geom.type!=='Point')return null;
+  var best=null,bd=COD_CERCA_BEBEDERO;
+  Object.values(S.elems).forEach(function(o){
+    if(o.type!=='bebedero'||o.id===el.id||!o.geom||o.geom.type!=='Point')return;
+    var d=metrosEntre(el,o);
+    if(d<bd){bd=d;best=o;}
+  });
+  return best;
+}
+
+// "B 12" libre -> "B 12"; tomado -> "B 12b", "B 12c"... (con espacio si termina en letra)
+function codConLetra(base,usados){
+  if(!usados[base.toLowerCase()])return base;
+  var sep=/\d$/.test(base)?'':' ';
+  for(var i=1;i<26;i++){
+    var c=base+sep+String.fromCharCode(97+i);
+    if(!usados[c.toLowerCase()])return c;
+  }
+  return base+sep+'z'+Date.now().toString(36);
+}
+// "BS" libre -> "BS"; tomado -> "BS2", "BS3"...
+function codSerie(base,usados){
+  if(!usados[base.toLowerCase()])return base;
+  for(var i=2;i<100;i++){if(!usados[(base+i).toLowerCase()])return base+i;}
+  return base+Date.now().toString(36);
+}
+// "L2" -> "L2-07": el número que sigue al más alto ya usado con ese prefijo
+function codNumero(pref,usados){
+  var max=0,re=new RegExp('^'+pref.toLowerCase()+'-(\\d+)$');
+  Object.keys(usados).forEach(function(k){var m=k.match(re);if(m)max=Math.max(max,parseInt(m[1],10));});
+  var n=max+1;
+  return pref+'-'+(n<10?'0':'')+n;
+}
+
+// Código sugerido para una pieza según su tipo y su lugar en el mapa.
+// `el` puede ser una pieza que todavía no existe: {id:'',type,sistema,geom}.
+// ctx (opcional): {usados, red, pend} para adjudicar muchas de una vez.
+function sugerirCodigo(el,ctx){
+  ctx=ctx||{};
+  var usados=ctx.usados||codUsados(el.id||null);
+  var red=ctx.red||codRed();
+  var pend=ctx.pend||{};
+  var t=el.type,g=el.geom||{};
+  if(t==='potrero'||!T[t])return '';
+  if(t==='tanque')return codConLetra('TQ'+(el.sistema||1),usados);
+  if(t==='bomba_solar')return codSerie('BS',usados);
+  if(t==='bomba')return codSerie('BE',usados);
+  if(t==='bebedero'&&g.type==='Point'){
+    var ps=codPotrerosDe(g.lat,g.lng);
+    if(ps.length)return codConLetra('B '+ps.join('-'),usados);
+    return codNumero('B'+codSistemaDe(el,red),usados);
+  }
+  var letra=COD_LETRA[t]||'P';
+  if(t==='llave_agua'){
+    var b=codBebederoDe(el);
+    if(b){
+      var cb=pend[b.id]||b.cod||sugerirCodigo(b,{usados:usados,red:red,pend:pend});
+      if(cb)return codConLetra('LB '+cb.replace(/^B\s+/,''),usados);
+    }
+    // cargada como llave pero el nombre dice que es un paso o una unión
+    if(/zanja|uni[oó]n/i.test(el.name||''))letra='U';
+  }
+  return codNumero(letra+codSistemaDe(el,red),usados);
+}
+
+// Propuesta para todas las piezas que todavía no tienen código, en orden:
+// tanques y bombas, bebederos, y el resto por sistema saliendo del tanque.
+function proponerCodigos(){
+  var red=codRed(),usados=codUsados(null),pend={};
+  var prio={tanque:0,bomba_solar:1,bomba:1,bebedero:2};
+  var tanqueDe={};
+  Object.values(S.elems).forEach(function(e){if(e.type==='tanque'&&!tanqueDe[e.sistema||1])tanqueDe[e.sistema||1]=e;});
+  var lista=Object.values(S.elems).filter(function(e){return e.type!=='potrero'&&T[e.type]&&!e.cod;});
+  var clave={};
+  lista.forEach(function(e){
+    var r=red[e.id],sis=r?r.sis:codSistemaDe(e,red),tq=tanqueDe[sis];
+    var dist=tq?metrosEntre(e,tq):0;
+    clave[e.id]=[prio[e.type]!=null?prio[e.type]:3,sis,r?0:1,r?r.salto:0,isFinite(dist)?dist:0];
+  });
+  lista.sort(function(a,b){
+    var ka=clave[a.id],kb=clave[b.id];
+    for(var i=0;i<ka.length;i++){if(ka[i]!==kb[i])return ka[i]-kb[i];}
+    return String(a.name).localeCompare(String(b.name),'es')||String(a.id).localeCompare(String(b.id));
+  });
+  return lista.map(function(e){
+    var c=sugerirCodigo(e,{usados:usados,red:red,pend:pend});
+    pend[e.id]=c;
+    if(c)usados[c.toLowerCase()]=e.id;
+    return {id:e.id,cod:c};
+  });
+}
+
+// El código dicho en palabras: "TL2-05 = T con llave · sistema 2 (Tanque Cerro Sur) · número 5"
+function describirCodigo(cod){
+  cod=codNorm(cod);
+  if(!cod)return '';
+  function nomSis(n){
+    var t=Object.values(S.elems).find(function(e){return e.type==='tanque'&&String(e.sistema||1)===String(n);});
+    return 'sistema '+n+(t?' ('+t.name+')':'');
+  }
+  function pots(txt){
+    var p=txt.split('-');
+    return p.length>1?'entre los potreros '+p.slice(0,-1).join(', ')+' y '+p[p.length-1]:'potrero '+txt;
+  }
+  // ¿El texto es tal cual el nombre de uno o más potreros? Entonces una letra
+  // suelta al final ("Lote x") es parte del nombre y no el "2º de ahí".
+  function sonPotreros(txt){
+    var ns={};
+    Object.values(S.elems).forEach(function(e){if(e.type==='potrero')ns[codNorm(e.name).toLowerCase()]=1;});
+    txt=txt.toLowerCase();
+    return !!ns[txt]||txt.split('-').every(function(p){return ns[p];});
+  }
+  var m;
+  if((m=cod.match(/^(L?B) (.+)$/))&&sonPotreros(m[2]))return cod+' = '+COD_DESC[m[1]]+' · '+pots(m[2]);
+  if((m=cod.match(/^(L?B) (.*\d)([b-z])$/))||(m=cod.match(/^(L?B) (.+) ([b-z])$/)))
+    return cod+' = '+COD_DESC[m[1]]+' · '+pots(m[2])+' · el '+(m[3].charCodeAt(0)-96)+'º de ahí';
+  if((m=cod.match(/^(L?B) (.+)$/)))return cod+' = '+COD_DESC[m[1]]+' · '+pots(m[2]);
+  if((m=cod.match(/^([A-Z]{1,2})(\d)-(\d+)$/))&&COD_DESC[m[1]])
+    return cod+' = '+COD_DESC[m[1]]+' · '+nomSis(m[2])+' · número '+parseInt(m[3],10);
+  if((m=cod.match(/^TQ(\d)/)))return cod+' = Tanque · '+nomSis(m[1]);
+  if((m=cod.match(/^(BS|BE)\d*$/)))return cod+' = '+COD_DESC[m[1]];
+  return cod+' = código propio (no sigue la guía)';
+}
+
 function simTog(id){
   const el=S.elems[id];
   const before=calcStates();
@@ -1168,7 +1518,7 @@ function buildStateReport(net){
 function showResultReport(title,net){
   const{con,sin}=buildStateReport(net);
   const lbl=net==='agua'?'AGUA':'ENERGÍA';
-  const mk=list=>list.length?list.map(e=>`<div class="mr-item">${T[e.type].ico} ${e.name}</div>`).join(''):'<div class="mr-item mr-none">— ninguno —</div>';
+  const mk=list=>list.length?list.map(e=>`<div class="mr-item">${T[e.type].ico} ${etq(e)}</div>`).join(''):'<div class="mr-item mr-none">— ninguno —</div>';
   document.getElementById('mr-title').textContent=title;
   document.getElementById('mr-body').innerHTML=
     `<div class="mr-grp"><div class="mr-h ok">✅ CON ${lbl} (${con.length})</div><div class="mr-list">${mk(con)}</div></div>`+
@@ -1220,7 +1570,9 @@ function renderAll(){
       const ss=el.salidas?` · ${el.salidas} sal`:'';
       const llegando=(!el.on&&watered.has(el.id)&&ti.net==='agua')?' 💧llegando':'';
       const ctip=el.cota!=null?` · ${el.cota}m`:''; 
-      m.bindTooltip(`${ti.ico} ${el.name}${vs}${ss}${llegando}${ctip}`,{direction:'top',offset:[0,-8]});
+      m.bindTooltip(`${ti.ico} ${etq(el)}${vs}${ss}${llegando}${ctip}`,{direction:'top',offset:[0,-8]});
+      // Etiqueta fija con el código, debajo del marcador (se oculta con el botón 🏷 o con el mapa lejos)
+      if(el.cod)L.marker([el.geom.lat,el.geom.lng],{interactive:false,keyboard:false,icon:L.divIcon({className:'cod-ico',html:`<div class="cod-lbl">${el.cod}</div>`,iconSize:[0,0],iconAnchor:[0,0]})}).addTo(elemL);
     }
     m.on('click',function(ev){if(connMode){L.DomEvent.stopPropagation(ev);handleConn(el.id);return;}if(JUNC.includes(el.type)&&el.outlets&&el.outlets.length>0)showJunc(el.id);else if(ti&&ti.valve)askTog(el.id);});
     m.addTo(elemL);
@@ -1243,7 +1595,7 @@ function setConnFilter(f,btn){
 }
 
 function renderLlaves(en,wa){
-  var ll=Object.values(S.elems).filter(function(e){return T[e.type]&&T[e.type].valve;}).sort(function(a,b){return a.name.localeCompare(b.name,'es');});
+  var ll=Object.values(S.elems).filter(function(e){return T[e.type]&&T[e.type].valve;}).sort(function(a,b){return etq(a).localeCompare(etq(b),'es',{numeric:true});});
   const d=document.getElementById('llave-list');
   if(!ll.length){d.innerHTML='<div class="es"><div class="bi">🔌</div>Sin llaves.<br>Importá KMZ en Config.</div>';return;}
   d.innerHTML=ll.map(el=>{
@@ -1255,7 +1607,7 @@ function renderLlaves(en,wa){
         return `<div class="ei" style="padding:6px 8px 6px 14px;border-left:2px solid ${o.open?'#42a5f5':'#ef5350'}" onclick="toggleOutlet('${el.id}',${i})">
           <span class="ei-ico" style="font-size:12px;color:${o.open?'#42a5f5':'#ef5350'}">${isWater?'🚰':'🔌'}</span>
           <div class="ei-info">
-            <div class="ei-name" style="font-size:11px">${el.name} — ${o.name||'Sal.'+(i+1)}</div>
+            <div class="ei-name" style="font-size:11px">${etq(el)} — ${o.name||'Sal.'+(i+1)}</div>
             <div class="ei-sub">${ti.lbl} · S${el.sistema||1} · ${flowing?'💧 FLUYE':'⛔ CORTADA'}</div>
           </div>
           <button class="vbtn ${o.open?'vo':'vc'}" onclick="event.stopPropagation();toggleOutlet('${el.id}',${i})">${o.open?'ABIERTA':'CERRADA'}</button>
@@ -1264,7 +1616,7 @@ function renderLlaves(en,wa){
       return `<div style="background:var(--surf);border:1px solid var(--brd);border-radius:6px;margin-bottom:4px;overflow:hidden">
         <div style="padding:6px 8px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="showJunc('${el.id}')">
           <span style="font-size:14px">${ti.ico}</span>
-          <div style="flex:1"><div style="font-size:12px;font-weight:600">${el.name}</div><div style="font-family:var(--mono);font-size:9px;color:var(--txt2)">${ti.lbl} · S${el.sistema||1} · ${el.outlets.length} salidas</div></div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">${etq(el)}</div><div style="font-family:var(--mono);font-size:9px;color:var(--txt2)">${ti.lbl} · S${el.sistema||1} · ${el.outlets.length} salidas</div></div>
           <button class="loc-btn" onclick="event.stopPropagation();locateElem('${el.id}')" title="Ver en mapa">📍</button>
         </div>
         ${juncRows}
@@ -1273,7 +1625,7 @@ function renderLlaves(en,wa){
     const flowing=isSrc?el.on:(ti.net==='agua'?wa:en).has(el.id);
     return `<div class="ei" style="${ti.valve?'cursor:pointer':''}">
       <span class="ei-ico" onclick="${ti.valve?`askTog('${el.id}')`:''}">${ti.ico}</span>
-      <div class="ei-info" onclick="${ti.valve?`askTog('${el.id}')`:''}" style="cursor:pointer"><div class="ei-name">${el.name}</div><div class="ei-sub">${ti.lbl} · S${el.sistema||1}</div></div>
+      <div class="ei-info" onclick="${ti.valve?`askTog('${el.id}')`:''}" style="cursor:pointer"><div class="ei-name">${etq(el)}</div><div class="ei-sub">${ti.lbl} · S${el.sistema||1}</div></div>
       <button class="loc-btn" onclick="event.stopPropagation();locateElem('${el.id}')" title="Ver en mapa">📍</button>
       ${ti.valve?`<button class="vbtn ${el.on?'vo':'vc'}" onclick="event.stopPropagation();askTog('${el.id}')">${el.on?'ABIERTA':'CERRADA'}</button>`:''}
     </div>`;
@@ -1281,7 +1633,7 @@ function renderLlaves(en,wa){
 }
 
 function renderInfra(){
-  var nonValve=Object.values(S.elems).filter(function(e){return T[e.type]&&!T[e.type].valve&&e.type!=='potrero';}).sort(function(a,b){return a.name.localeCompare(b.name,'es');});
+  var nonValve=Object.values(S.elems).filter(function(e){return T[e.type]&&!T[e.type].valve&&e.type!=='potrero';}).sort(function(a,b){return etq(a).localeCompare(etq(b),'es',{numeric:true});});
   const d=document.getElementById('infra-list');
   if(!nonValve.length){d.innerHTML='<div class="es" style="padding:10px"><div class="bi" style="font-size:16px">💧</div>Sin elementos.</div>';return;}
   const{energized,watered}=calcStates();
@@ -1290,7 +1642,7 @@ function renderInfra(){
     const active=ti.net==='elec'?energized.has(e.id):watered.has(e.id);
     return `<div class="ic" onclick="showEdit('${e.id}')">
       <div class="ic-ico">${ti.ico}</div>
-      <div class="ic-name">${e.name}</div>
+      <div class="ic-name">${etq(e)}</div>
       <div class="ic-state" style="color:${active?'var(--green2)':'var(--txt3)'};background:${active?'rgba(76,175,80,.12)':'rgba(255,255,255,.04)'}">${active?'● ACTIVO':'○ INACT.'}</div>
       <button class="loc-btn" style="margin-top:4px;width:100%" onclick="event.stopPropagation();locateElem('${e.id}')" title="Ver en mapa">📍</button>
     </div>`;
@@ -1337,13 +1689,13 @@ function renderAvisoBebederos(wa){
     h+='<div class="sim"><div class="sim-t">⚠ '+porLlave.length+' SIN AGUA POR LLAVE CERRADA</div><ul>';
     porLlave.forEach(function(b){
       var l=llaveCulpable(b.id);
-      h+='<li><b>'+b.name+'</b>'+(l?' — cerrada: <b>'+l.name+'</b>':'')+'</li>';
+      h+='<li><b>'+etq(b)+'</b>'+(l?' — cerrada: <b>'+etq(l)+'</b>':'')+'</li>';
     });
     h+='</ul></div>';
   }
   if(sinCano.length){
     h+='<div class="sim"><div class="sim-t">🔌 '+sinCano.length+' SIN CAÑO HASTA UN TANQUE</div><ul>';
-    sinCano.forEach(function(b){ h+='<li>'+b.name+'</li>'; });
+    sinCano.forEach(function(b){ h+='<li>'+etq(b)+'</li>'; });
     h+='</ul><div style="font-size:10px;color:var(--txt3);margin-top:4px">Se resuelven en Configuración → Conexiones pendientes.</div></div>';
   }
   cont.innerHTML=h;
@@ -1375,7 +1727,7 @@ function renderPanelPot(pts,en,wa){
   var d=document.getElementById('panel-pot-list');
   if(!d)return;
   if(!pts||!pts.length){d.innerHTML='<div class="es">Sin potreros.</div>';return;}
-  var sorted=pts.slice().sort(function(a,b){return a.name.localeCompare(b.name,'es');});
+  var sorted=pts.slice().sort(function(a,b){return etq(a).localeCompare(etq(b),'es',{numeric:true});});
   var html='';
   sorted.forEach(function(p){
     var hE=en.has(p.id),hW=wa.has(p.id);
@@ -1450,12 +1802,16 @@ function renderCfg(){
   document.getElementById('cfg-cc').textContent=S.conns.length;
   contarPendientes();
   const el=document.getElementById('cfg-el');
-  const items=Object.values(S.elems).sort((a,b)=>a.name.localeCompare(b.name,'es'));
-  if(!items.length){el.innerHTML='<div style="font-size:11px;color:var(--txt3)">Sin elementos</div>';return;}
-  el.innerHTML=items.map(e=>`
+  const sinCod=document.getElementById('cfg-sincod');
+  if(sinCod)sinCod.textContent=Object.values(S.elems).filter(e=>e.type!=='potrero'&&T[e.type]&&!e.cod).length;
+  const cfgQ=(document.getElementById('cfg-q')?.value||'').trim().toLowerCase();
+  const items=Object.values(S.elems).filter(e=>!cfgQ||etq(e).toLowerCase().includes(cfgQ)).sort((a,b)=>etq(a).localeCompare(etq(b),'es',{numeric:true}));
+  // Sin `return` acá: con el filtro puesto la lista de conexiones de abajo se tiene que seguir dibujando
+  if(!items.length)el.innerHTML='<div style="font-size:11px;color:var(--txt3)">'+(cfgQ?'Nada con ese código o nombre':'Sin elementos')+'</div>';
+  else el.innerHTML=items.map(e=>`
     <div class="cfg-row">
       <span style="font-size:13px">${T[e.type]?.ico||'?'}</span>
-      <span style="flex:1;font-size:11px">${e.name}</span>
+      <span style="flex:1;font-size:11px">${etq(e)}</span>
       <button onclick="startMove('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">📍</button>
       <button onclick="showEdit('${e.id}')" style="background:transparent;border:none;color:var(--txt2);font-size:10px;cursor:pointer;font-family:var(--mono)">✏️</button>
       <button onclick="delElem('${e.id}')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>
@@ -1471,10 +1827,185 @@ function renderCfg(){
     const a=S.elems[c.from],b=S.elems[c.to];if(!a||!b)return'';
     return `<div class="cfg-row">
       <span style="font-size:10px">${c.net==='agua'?'💧':'⚡'}</span>
-      <span style="flex:1;font-size:10px">${a.name} ↔ ${b.name}</span>
+      <span style="flex:1;font-size:10px">${a.cod||a.name} ↔ ${b.cod||b.name}</span>
       <button onclick="delConn('${c.id}')" style="background:transparent;border:none;color:var(--red);font-size:10px;cursor:pointer;font-family:var(--mono)">✕</button>
     </div>`;
   }).join('');
+}
+
+// ── CÓDIGOS: PANTALLA ──────────────────────────────────────
+var COD_LBL_KEY='mhe_cod_lbl';
+var codLblOn=true;
+try{ codLblOn = localStorage.getItem(COD_LBL_KEY)!=='0'; }catch(e){}
+var codManual=false; // true cuando Pedro escribió el código a mano: no se lo piso
+
+function aplicarCodLbl(){
+  var m=document.getElementById('map'),b=document.getElementById('btn-cod');
+  if(m){
+    m.classList.toggle('cod-off',!codLblOn);
+    m.classList.toggle('cod-lejos',!!map&&map.getZoom()<16);
+  }
+  if(b)b.classList.toggle('active',codLblOn);
+}
+function togCodLbl(){
+  codLblOn=!codLblOn;
+  try{localStorage.setItem(COD_LBL_KEY,codLblOn?'1':'0');}catch(e){}
+  aplicarCodLbl();
+  if(codLblOn&&map&&map.getZoom()<16)showToast('🏷','Códigos prendidos','Acercá el mapa para verlos.');
+}
+
+function showGuia(){
+  var t=document.getElementById('guia-sis');
+  if(t){
+    var tq=Object.values(S.elems).filter(function(e){return e.type==='tanque';})
+      .sort(function(a,b){return (a.sistema||9)-(b.sistema||9);});
+    t.innerHTML=tq.length?tq.map(function(e){
+      return '<tr><td>Sistema '+(e.sistema||1)+'</td><td>'+(e.cod?e.cod+' · ':'')+e.name+'</td></tr>';
+    }).join(''):'<tr><td>—</td><td>Todavía no hay tanques cargados.</td></tr>';
+  }
+  document.getElementById('m-guia').classList.add('on');
+}
+
+// La pieza tal como está en el formulario (puede no existir todavía)
+function elemDelForm(){
+  var id=document.getElementById('me-id').value;
+  var ex=S.elems[id];
+  var ll=document._ll;
+  var geom=ex?ex.geom:(pendingGeom?pendingGeom:(ll?{type:'Point',lat:ll.lat,lng:ll.lng}:null));
+  return {id:id||'',type:document.getElementById('me-type').value,
+    sistema:parseInt(document.getElementById('me-sist').value)||1,
+    name:document.getElementById('me-name').value,geom:geom};
+}
+// Pieza nueva colocada en el mapa: el sistema también se sugiere por el lugar
+// (el de la pieza con caño más cercana).
+function sistemaPorLugar(){
+  var ll=document._ll;
+  if(!ll||document.getElementById('me-id').value)return;
+  var s=codSistemaDe({id:'',type:'llave_agua',sistema:1,geom:{type:'Point',lat:ll.lat,lng:ll.lng}},codRed());
+  document.getElementById('me-sist').value=String(s);
+}
+function updateCodHint(){
+  var h=document.getElementById('me-cod-hint');if(!h)return;
+  var id=document.getElementById('me-id').value;
+  var c=codNorm(document.getElementById('me-cod').value);
+  if(document.getElementById('me-type').value==='potrero'){h.style.color='var(--txt2)';h.textContent='Los potreros no llevan código: su nombre ya es el código.';return;}
+  if(!c){h.style.color='var(--txt2)';h.textContent='Sin código. Tocá 🏷 Sugerir y te propongo uno según el lugar.';return;}
+  var otro=codUsados(id||null)[c.toLowerCase()];
+  if(otro){h.style.color='var(--red)';h.textContent='⚠ Ese código ya lo tiene: '+etq(S.elems[otro]);return;}
+  h.style.color='var(--txt2)';h.textContent=describirCodigo(c);
+}
+// Rellena el código sugerido. forzar=true: aunque Pedro haya escrito uno a mano.
+function sugerirEnForm(forzar){
+  if(!forzar&&codManual)return;
+  var el=elemDelForm();
+  var c=sugerirCodigo(el);
+  document.getElementById('me-cod').value=c;
+  codManual=false;
+  updateCodHint();
+  if(forzar&&!c)showToast('🏷','Sin sugerencia','Los potreros no llevan código: su nombre ya es el código.');
+}
+
+// Ventana para adjudicar de una vez a todas las piezas que no tienen código
+function showAdjudicar(){
+  var prop=proponerCodigos();
+  if(!prop.length){showToast('✅','Todo con código','Todas las piezas ya tienen su código.');return;}
+  exitAll();
+  document.getElementById('cod-sub').innerHTML=prop.length+' pieza(s) sin código. Esta es mi propuesta. <b>Cambiá lo que no te guste</b> y tocá Aceptar. Si borrás un código, esa pieza queda sin código por ahora.';
+  document.getElementById('cod-lista').innerHTML=prop.map(function(p){
+    var e=S.elems[p.id],ti=T[e.type]||{ico:'•',lbl:e.type};
+    var pots=(e.geom&&e.geom.type==='Point')?codPotrerosDe(e.geom.lat,e.geom.lng):[];
+    return '<div class="cod-row">'+
+      '<input type="text" maxlength="30" data-cod="'+e.id+'" value="'+codNorm(p.cod)+'" autocomplete="off">'+
+      '<div class="cod-info">'+ti.ico+' '+e.name+
+        '<small>'+ti.lbl+(pots.length?' · potrero '+pots.join(' / '):'')+(e.cota!=null?' · '+e.cota+' m':'')+'</small></div>'+
+      '<button class="loc-btn" data-loc="'+e.id+'" title="Ver en mapa">📍</button></div>';
+  }).join('');
+  document.getElementById('cod-lista').querySelectorAll('[data-loc]').forEach(function(b){
+    b.addEventListener('click',function(){closeM('m-cod');locateElem(b.getAttribute('data-loc'));});
+  });
+  document.getElementById('m-cod').classList.add('on');
+}
+function aceptarCodigos(){
+  var ins=Array.prototype.slice.call(document.getElementById('cod-lista').querySelectorAll('[data-cod]'));
+  var usados=codUsados(null),nuevos={},mal=null;
+  ins.forEach(function(i){
+    i.style.borderColor='';
+    var c=codNorm(i.value);i.value=c;
+    if(!c)return;
+    var k=c.toLowerCase();
+    if(usados[k]||nuevos[k]){i.style.borderColor='var(--red)';if(!mal)mal=i;return;}
+    nuevos[k]={id:i.getAttribute('data-cod'),cod:c};
+  });
+  if(mal){
+    mal.scrollIntoView({block:'center'});
+    showToast('⚠️','Código repetido','"'+mal.value+'" está dos veces. Cambiá uno (marcados en rojo).');
+    return;
+  }
+  var n=0;
+  Object.keys(nuevos).forEach(function(k){
+    var e=S.elems[nuevos[k].id];if(!e)return;
+    e.cod=nuevos[k].cod;
+    e.antes=e.name; // el nombre que tenía antes del código: se muestra como "antes ..."
+    n++;
+  });
+  if(n){addHist('Config','Adjudicó códigos a '+n+' pieza(s)','');save();}
+  closeM('m-cod');
+  renderAll();renderCfg();
+  showToast('🏷','Códigos adjudicados',n+' pieza(s) con código nuevo.');
+}
+
+// Buscador de la pestaña MAPA
+function renderBuscar(){
+  var q=document.getElementById('buscar-q').value.trim().toLowerCase();
+  var d=document.getElementById('buscar-res');
+  if(!q){d.innerHTML='';return;}
+  var res=Object.values(S.elems).filter(function(e){
+    return e.geom&&((e.cod||'').toLowerCase().indexOf(q)>=0||(e.name||'').toLowerCase().indexOf(q)>=0);
+  }).sort(function(a,b){
+    var pa=(a.cod||'').toLowerCase().indexOf(q)===0?0:1,pb=(b.cod||'').toLowerCase().indexOf(q)===0?0:1;
+    return (pa-pb)||etq(a).localeCompare(etq(b),'es',{numeric:true});
+  }).slice(0,12);
+  if(!res.length){d.innerHTML='<div style="font-size:11px;color:var(--txt3);padding:4px 2px">Nada con ese código o nombre.</div>';return;}
+  d.innerHTML=res.map(function(e){
+    var ti=T[e.type]||{ico:'•',lbl:e.type};
+    return '<div class="ei" data-loc="'+e.id+'"><span class="ei-ico">'+ti.ico+'</span>'+
+      '<div class="ei-info"><div class="ei-name">'+etq(e)+'</div>'+
+      '<div class="ei-sub">'+ti.lbl+(e.type!=='potrero'?' · S'+(e.sistema||1):'')+'</div></div>'+
+      '<span class="loc-btn">📍</span></div>';
+  }).join('');
+  d.querySelectorAll('[data-loc]').forEach(function(b){
+    b.addEventListener('click',function(){locateElem(b.getAttribute('data-loc'));});
+  });
+}
+
+// Lista de piezas para imprimir y marcar en el campo
+function imprimirPiezas(){
+  var piezas=Object.values(S.elems).filter(function(e){return e.type!=='potrero'&&T[e.type];})
+    .sort(function(a,b){
+      return ((a.cod?0:1)-(b.cod?0:1))||etq(a).localeCompare(etq(b),'es',{numeric:true});
+    });
+  var guia=['B|Bebedero. Lleva el nombre del potrero: B 12. En un alambrado: B 15-18',
+    'LB|Llave de un bebedero: LB 12','L|Llave de corte','TL|T con llave','T|T sin llave',
+    'XL|Cruz con llave','X|Cruz sin llave','U|Unión o paso de zanja','VR|Válvula de retención',
+    'TQ|Tanque','BS · BE|Bomba solar · Bomba eléctrica'];
+  var h='<h1>Piezas de la red de agua y electricidad</h1>'+
+    '<p>'+new Date().toLocaleDateString('es-UY')+' · '+piezas.length+' piezas · '+piezas.filter(function(e){return !e.cod;}).length+' sin código</p>'+
+    '<h2>Guía de códigos</h2>'+
+    '<p>Caño principal: letra = qué es · primer número = sistema · segundo número = orden saliendo del tanque. Ejemplo: L2-03.</p>'+
+    '<table><tr><th>Letra</th><th>Qué es</th></tr>'+guia.map(function(g){var p=g.split('|');return '<tr><td class="c">'+p[0]+'</td><td>'+p[1]+'</td></tr>';}).join('')+'</table>'+
+    '<h2>Lista de piezas</h2>'+
+    '<table><tr><th>Código</th><th>Qué es</th><th>Potrero</th><th>Sist.</th><th>Nombre o descripción</th><th>Cota</th><th>Marcada ✔</th></tr>'+
+    piezas.map(function(e){
+      var pots=(e.geom&&e.geom.type==='Point')?codPotrerosDe(e.geom.lat,e.geom.lng):[];
+      return '<tr><td class="c">'+(e.cod||'—')+'</td><td>'+T[e.type].lbl+'</td><td>'+pots.join(' / ')+'</td><td>'+(e.sistema||'')+
+        '</td><td>'+(e.name&&e.name!==e.cod?e.name:'')+'</td><td>'+(e.cota!=null?e.cota+' m':'')+'</td><td></td></tr>';
+    }).join('')+'</table>';
+  var pa=document.getElementById('print-area');
+  pa.innerHTML=h;
+  document.body.classList.add('printing');
+  var fin=function(){document.body.classList.remove('printing');window.removeEventListener('afterprint',fin);};
+  window.addEventListener('afterprint',fin);
+  setTimeout(function(){window.print();},50);
 }
 
 // ── ELEMENT CRUD ───────────────────────────────────────────
@@ -1490,6 +2021,8 @@ function resetElemForm(){
     document.getElementById('me-sist').value='1';
     document.getElementById('me-on').value='1';
     document.getElementById('me-sal').value='2';
+    sistemaPorLugar();
+    codManual=false; // vuelve a sugerir el código para el tipo por defecto
     onType();
   }
   showToast('↺','Formulario limpiado','Podés ingresar los nuevos datos.');
@@ -1506,6 +2039,8 @@ function onType(){
     if(isNaN(cur)||cur<0)document.getElementById('me-sal').value=t.endsWith('_t')?'2':'3';
   }
   updateSalPreview();
+  // Pieza nueva: el código sugerido sigue al tipo (salvo que Pedro ya haya escrito uno)
+  if(!document.getElementById('me-id').value)sugerirEnForm(false);
 }
 
 // Los candidatos son los vecinos ya conectados: el sentido se define contra
@@ -1521,7 +2056,7 @@ function llenarSentidoRetencion(id, actual){
     if(!otro)return;
     var o=document.createElement('option');
     o.value=otro.id;
-    o.textContent=(T[otro.type]?T[otro.type].ico:'•')+' '+otro.name+(otro.cota!=null?' · '+otro.cota+' m':'');
+    o.textContent=(T[otro.type]?T[otro.type].ico:'•')+' '+etq(otro)+(otro.cota!=null?' · '+otro.cota+' m':'');
     if(otro.id===actual)o.selected=true;
     sel.appendChild(o);
   });
@@ -1550,8 +2085,11 @@ function showAdd(ll){
   document.getElementById('me-type').value='llave_agua';document.getElementById('me-sist').value='1';
   document.getElementById('me-on').value='1';document.getElementById('me-del').style.display='none';
   document.getElementById('me-cota').value='';
+  document.getElementById('me-cod').value='';codManual=false;
   llenarSentidoRetencion(null,null);
-  document._ll=ll;pendingGeom=null;onType();document.getElementById('m-elem').classList.add('on');
+  document._ll=ll;pendingGeom=null;
+  sistemaPorLugar();
+  onType();document.getElementById('m-elem').classList.add('on');
 }
 
 function showEdit(id){
@@ -1570,18 +2108,27 @@ function showEdit(id){
   }
   llenarSentidoRetencion(id, el.salidaHacia);
   document.getElementById('me-del').style.display='block';
-  document._ll=null;pendingGeom=null;onType();updateSalPreview();
+  // Al editar no se cambia el código solo: un código adjudicado no cambia más
+  document.getElementById('me-cod').value=el.cod||'';codManual=true;
+  document._ll=null;pendingGeom=null;onType();updateSalPreview();updateCodHint();
   document.getElementById('m-elem').classList.add('on');
 }
 
 function saveElem(){
   const id=document.getElementById('me-id').value||uid();
-  const name=document.getElementById('me-name').value.trim();
+  let name=document.getElementById('me-name').value.trim();
   const type=document.getElementById('me-type').value;
   const sist=parseInt(document.getElementById('me-sist').value);
   const on=document.getElementById('me-on').value==='1';
   const salidas=JUNC.includes(type)?parseInt(document.getElementById('me-sal').value):null;
-  if(!name){showToast('⚠️','Nombre requerido','Ingresá un nombre para el elemento.');return;}
+  const cod=type==='potrero'?'':codNorm(document.getElementById('me-cod').value);
+  if(!T[type]){showToast('⚠️','Tipo requerido','Elegí el tipo de elemento.');return;}
+  if(cod){
+    const otro=codUsados(id)[cod.toLowerCase()];
+    if(otro){showToast('⚠️','Código repetido','"'+cod+'" ya lo tiene '+etq(S.elems[otro])+'. Poné otro o tocá 🏷 Sugerir.');return;}
+  }
+  if(!name)name=cod; // con código, el nombre es opcional
+  if(!name){showToast('⚠️','Falta el código o el nombre','Poné un código (tocá 🏷 Sugerir) o un nombre.');return;}
   const ex=S.elems[id];const ll=document._ll;
   const dg=pendingGeom?pendingGeom:ll?{type:'Point',lat:ll.lat,lng:ll.lng}:{type:'Point',lat:map.getCenter().lat,lng:map.getCenter().lng};
   let outlets=ex?.outlets||null;
@@ -1612,7 +2159,9 @@ function saveElem(){
   var salidaHacia=(type==='valvula_retencion')
     ? (document.getElementById('me-ret').value||null)
     : (ex?ex.salidaHacia:null)||null;
-  S.elems[id]={id,type,name,sistema:sist,on,salidas,outlets,cota,salidaHacia,geom:ex?.geom||dg,fromKMZ:ex?.fromKMZ||false};
+  // `antes` (el nombre viejo) se conserva solo mientras el nombre no cambie
+  const antes=(ex&&ex.antes&&ex.antes===name)?ex.antes:null;
+  S.elems[id]={id,type,name,cod:cod||null,antes,sistema:sist,on,salidas,outlets,cota,salidaHacia,geom:ex?.geom||dg,fromKMZ:ex?.fromKMZ||false};
   pendingGeom=null;document._ll=null;closeM('m-elem');
   // Auto-insertar en conexión existente si es T/Cruz nueva colocada en el mapa
   var canAutoInsert=JUNC.includes(type)||type==='llave_agua'||type==='llave_elec';
@@ -1643,7 +2192,7 @@ function locateElem(id){
   });
   var pulse=L.marker([lat,lng],{icon:pulseIcon,zIndexOffset:2000}).addTo(map);
   // Tooltip con nombre
-  pulse.bindTooltip(ti.ico+' '+el.name,{permanent:true,direction:'top',offset:[0,-22],className:'locate-tip'}).openTooltip();
+  pulse.bindTooltip(ti.ico+' '+etq(el),{permanent:true,direction:'top',offset:[0,-22],className:'locate-tip'}).openTooltip();
   // Eliminar después de 3 segundos
   setTimeout(function(){map.removeLayer(pulse);},3000);
 }
@@ -1675,8 +2224,8 @@ function autoInsertInConn(newId, ll){
   });
   if(!best) return;
   var fromId=best.from, toId=best.to, net=best.net;
-  var fromName=S.elems[fromId]?S.elems[fromId].name:'?';
-  var toName=S.elems[toId]?S.elems[toId].name:'?';
+  var fromName=S.elems[fromId]?(S.elems[fromId].cod||S.elems[fromId].name):'?';
+  var toName=S.elems[toId]?(S.elems[toId].cod||S.elems[toId].name):'?';
   // Eliminar conexión original
   S.conns=S.conns.filter(function(c){return c.id!==best.id;});
   // Crear dos conexiones: from→nuevo y nuevo→to
@@ -1801,7 +2350,7 @@ function renderPendientes(){
     const est=n?`${n} conexión(es), pero ninguna llega a un tanque`:'sin ninguna conexión';
     return `<div class="pc" style="margin-bottom:5px">
       <div class="pc-top">
-        <span class="pc-n">${ti.ico} ${e.name}</span>
+        <span class="pc-n">${ti.ico} ${etq(e)}</span>
         <button class="cb" data-pend="${e.id}" style="width:auto;padding:2px 10px;margin:0">Conectar</button>
       </div>
       <div style="font-size:10px;color:var(--txt3)">${ti.lbl} · ${est}${e.cota!=null?' · '+e.cota+' m':''}</div>
@@ -1821,14 +2370,14 @@ function elegirVecino(id){
     .sort((a,b)=>(b.llega-a.llega)||(a.d-b.d))
     .slice(0,12);
   const ti=T[e.type]||{ico:'•'};
-  document.getElementById('pend-title').textContent='CONECTAR '+e.name.toUpperCase();
+  document.getElementById('pend-title').textContent='CONECTAR '+(e.cod||e.name).toUpperCase();
   document.getElementById('pend-sub').innerHTML=
-    `${ti.ico} <b>${e.name}</b> — elegí con qué se une. Los marcados con 💧 ya reciben agua de un tanque.`;
+    `${ti.ico} <b>${etq(e)}</b> — elegí con qué se une. Los marcados con 💧 ya reciben agua de un tanque.`;
   document.getElementById('pend-lista').innerHTML=cand.map(c=>{
     const t2=T[c.o.type]||{ico:'•',lbl:c.o.type};
     return `<div class="pc" style="margin-bottom:5px">
       <div class="pc-top">
-        <span class="pc-n">${c.llega?'💧 ':''}${t2.ico} ${c.o.name}</span>
+        <span class="pc-n">${c.llega?'💧 ':''}${t2.ico} ${etq(c.o)}</span>
         <button class="cb" data-con="${c.o.id}" style="width:auto;padding:2px 10px;margin:0">Unir</button>
       </div>
       <div style="font-size:10px;color:var(--txt3)">${t2.lbl} · a ${c.d<1?'menos de 1':Math.round(c.d)} m${c.o.cota!=null?' · '+c.o.cota+' m':''}</div>
@@ -2036,7 +2585,7 @@ function showPicker(elems,px){
     return `<div class="pick-item" onclick="pickElem('${e.id}')">
       <span class="pick-ico">${ti.ico}</span>
       <div class="pick-info">
-        <div class="pick-name">${e.name}</div>
+        <div class="pick-name">${etq(e)}</div>
         <div class="pick-sub">${ti.lbl}${e.sistema?' · S'+e.sistema:''}</div>
       </div>
       ${stateHtml}
@@ -2073,7 +2622,7 @@ function showJunc(id){
     askTog(id);
     return;
   }
-  document.getElementById('mj-title').textContent=ti.ico+' '+el.name;
+  document.getElementById('mj-title').textContent=ti.ico+' '+etq(el);
   renderJuncOutlets(id);
   document.getElementById('m-junc').classList.add('on');
 }
@@ -2342,6 +2891,7 @@ async function importJSON(inp){
     Object.assign(S.elems,d.elems);
     if(d.conns)S.conns.push.apply(S.conns,d.conns);
     if(d.hist)S.hist.push.apply(S.hist,d.hist);
+    limpiarCods();
     console.log('[Import] elems:',Object.keys(S.elems).length,'conns:',S.conns.length);
     save();
     // Guardar como seed propio para dispositivos nuevos
@@ -2553,6 +3103,8 @@ window.addEventListener('DOMContentLoaded', function(){
   baseL=L.layerGroup().addTo(map);
   elemL=L.layerGroup().addTo(map);
   aplicarTrabaMapa();
+  map.on('zoomend',aplicarCodLbl);
+  aplicarCodLbl();
   map.on('click',function(e){
     if(drawMode){
       var pt=e.latlng;
