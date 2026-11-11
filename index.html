@@ -328,7 +328,7 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.6 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.7 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
     <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
@@ -3098,7 +3098,12 @@ window.addEventListener('DOMContentLoaded', function(){
   var bn=document.getElementById('build-note');if(bn&&BUILD_NOTE)bn.textContent='['+BUILD_NOTE+']';
   osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'});
   sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'});
-  map=L.map('map',{layers:[osm],zoomControl:true,attributionControl:false,maxBoundsViscosity:1.0});
+  // Abierta como archivo (file://), OpenStreetMap rechaza los mosaicos y el mapa
+  // se llena de carteles "Access blocked 403". Ahí se arranca en satelital
+  // (Esri), que sí carga. Por internet (https) sigue arrancando con el mapa común.
+  var arrancaSat=(location.protocol==='file:');
+  map=L.map('map',{layers:[arrancaSat?sat:osm],zoomControl:true,attributionControl:false,maxBoundsViscosity:1.0});
+  if(arrancaSat){satOn=true;var bSat=document.getElementById('btn-sat');if(bSat)bSat.classList.add('active');}
   map.setView([-31.4,-55.42],13);
   baseL=L.layerGroup().addTo(map);
   elemL=L.layerGroup().addTo(map);
