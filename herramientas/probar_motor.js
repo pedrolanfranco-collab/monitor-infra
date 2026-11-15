@@ -29,7 +29,7 @@ function extraer(html, nombre) {
 
 function correr(S, htmlPath) {
   const html = fs.readFileSync(htmlPath, 'utf8');
-  const src = extraer(html, 'calcStates') + '\n' + extraer(html, 'ptInPoly');
+  const src = ['salidasConfiguradas', 'salidaBloquea', 'calcStates', 'ptInPoly'].map(f => extraer(html, f)).join('\n');
   const ctx = { S, T, JUNC, console };
   vm.createContext(ctx);
   vm.runInContext(src + '\nglobalThis.__r=calcStates();', ctx);

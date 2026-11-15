@@ -174,6 +174,26 @@ body{display:flex;flex-direction:column}
 .guia-t td:first-child{font-family:var(--mono);font-weight:700;color:var(--green2);white-space:nowrap}
 .guia-h{font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--green2);margin:8px 0 2px}
 .guia-p{font-size:11px;color:var(--txt2);line-height:1.35}
+/* CROQUIS: fondo liso, límites finos de potreros y caños con halo. Sin mosaicos. */
+.fondo-croquis.leaflet-container{background:#f1f0e8}
+.fondo-croquis .pot-lbl{color:#35443c!important;text-shadow:0 0 3px #fff}
+/* cartel "N piezas · tocá para elegir" sobre piezas apiladas: solo con el mapa cerca, de lejos tapa todo */
+.apiladas-tip{font-size:10px;padding:2px 6px}
+#map.cod-lejos .apiladas-tip{display:none}
+.pick-croquis strong{display:block;margin-bottom:2px}
+.pick-croquis button{display:block;width:100%;margin-top:6px;padding:6px 8px;text-align:left;cursor:pointer;border:1px solid #9aa;border-radius:4px;background:#fff;font-size:12px}
+.pick-croquis button:hover{background:#e6f0ea}
+/* SALIDAS de T y cruces: cada salida con su caño y, si tiene, su llave */
+.cruz-salidas fieldset{border:1px solid var(--brd2);border-radius:6px;padding:6px 10px 9px;margin:0 0 8px}
+.cruz-salidas legend{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green2);padding:0 5px}
+.cruz-salidas select{max-width:100%}
+.cruz-salidas label{display:flex;align-items:center;gap:6px;margin:7px 0 0;text-transform:none;letter-spacing:0;font-family:var(--sans);font-size:12px;color:var(--txt)}
+.cruz-salidas label input{width:auto}
+.cruz-salidas .cs-estado{margin-top:7px;padding:6px 10px;border-radius:4px;border:1px solid var(--brd2);background:var(--surf2);color:var(--txt);font-size:12px;cursor:pointer}
+.cruz-salidas .cs-estado.cerrada{border-color:var(--red);color:var(--red)}
+.cruz-salidas .cs-nota{font-size:10px;color:var(--txt3);margin-top:5px}
+.cruz-salidas .cs-ren{background:transparent;border:none;cursor:pointer;font-size:11px;margin-left:4px}
+.cruz-salidas .cs-guardar{width:100%;padding:8px;border:none;border-radius:6px;background:var(--green);color:#0a1a0b;font-weight:700;cursor:pointer;font-size:12px}
 #print-area{display:none}
 @media print{
   html,body{height:auto!important;overflow:visible!important;background:#fff!important}
@@ -328,10 +348,11 @@ body{display:flex;flex-direction:column}
 
 <div id="hdr">
   <div id="brand">
-    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.7 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
+    <div><div class="logo">⚡💧 INFRAESTRUCTURA</div><div class="sub">MONITOR HIDRÁULICO Y ELÉCTRICO · v61.8 <span id="build-note" style="color:var(--amber);font-size:9px;margin-left:6px;font-style:italic"></span></div></div>
   </div>
   <div id="tabs">
-    <button class="tab active" onclick="goTab('mapa',this)">🗺 MAPA</button>
+    <button class="tab active" onclick="goTab('mapa',this);if(croquisOn)toggleCroquis()">🗺 MAPA</button>
+    <button class="tab" id="btn-croquis" aria-pressed="false" onclick="goTab('mapa',this);if(!croquisOn)toggleCroquis()">✏ CROQUIS</button>
     <button class="tab" onclick="goTab('potreros',this)">🌿 POTREROS</button>
     <button class="tab" onclick="goTab('historial',this)">📋 LOG</button>
     <button class="tab" onclick="goTab('red',this)">🔗 RED</button>
@@ -719,7 +740,7 @@ body{display:flex;flex-direction:column}
 <div class="modal" id="m-junc">
   <div class="mbox">
     <h2 id="mj-title">DISTRIBUCIÓN</h2>
-    <p style="font-size:11px;color:var(--txt2);margin-bottom:10px">Abrí o cerrá cada salida individualmente.</p>
+    <p style="font-size:11px;color:var(--txt2);margin-bottom:10px">Decí a qué caño va cada salida y si lleva llave. Una salida con llave cerrada corta ese caño en los dos sentidos.</p>
     <div id="mj-outlets"></div>
     <div class="mac" style="margin-top:12px">
       <button class="m-cn" onclick="closeM('m-junc')">Cerrar</button>
@@ -849,9 +870,9 @@ body{display:flex;flex-direction:column}
       <div class="guia-p">Letra = qué es. Primer número = sistema. Segundo número = orden saliendo del tanque.<br>Ejemplo: <span class="cod-tag">L2-03</span> = llave de corte · sistema 2 · la tercera.</div>
       <table class="guia-t">
         <tr><td>L</td><td>Llave de corte</td></tr>
-        <tr><td>TL</td><td>T con llave</td></tr>
+        <tr><td>TL</td><td>T con llave. TL2-04-L1 identifica la llave de la salida 1.</td></tr>
         <tr><td>T</td><td>T sin llave</td></tr>
-        <tr><td>XL</td><td>Cruz con llave</td></tr>
+        <tr><td>XL</td><td>Cruz con llave. XL2-03-L3 identifica la llave de la salida 3.</td></tr>
         <tr><td>X</td><td>Cruz sin llave</td></tr>
         <tr><td>U</td><td>Unión o paso de zanja</td></tr>
         <tr><td>VR</td><td>Válvula de retención (un solo sentido)</td></tr>
@@ -919,7 +940,65 @@ function togTrabaMapa(){
                :'Ya podés arrastrarlo y hacer zoom con los dedos.');
 }
 
-function togLayer(){if(!map)return;satOn=!satOn;satOn?(map.addLayer(sat),map.removeLayer(osm)):(map.addLayer(osm),map.removeLayer(sat));var b=document.getElementById('btn-sat');if(b)b.classList.toggle('active',satOn);}
+// ── CROQUIS ────────────────────────────────────────────────
+// Tercer fondo, además de mapa y satelital: liso, sin mosaicos, con los
+// límites de los potreros finos y los caños bien marcados. Deja acercar mucho
+// más (zoom 23) porque no depende de imágenes. No cambia ningún dato.
+var croquisOn=false;
+function toggleCroquis(){
+  if(!map)return;
+  croquisOn=!croquisOn;
+  map.setMaxZoom(croquisOn?23:19);
+  if(croquisOn){map.removeLayer(osm);map.removeLayer(sat);map.removeLayer(baseL);}
+  else{map.addLayer(satOn?sat:osm);map.addLayer(baseL);}
+  map.getContainer().classList.toggle('fondo-croquis',croquisOn);
+  var b=document.getElementById('btn-croquis');
+  if(b){
+    b.setAttribute('aria-pressed',String(croquisOn));
+    // la pestaña activa es CROQUIS o MAPA según el fondo (las dos muestran el panel del mapa)
+    if(document.getElementById('pv-mapa').classList.contains('on')){
+      document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+      (croquisOn?b:document.querySelector('.tab')).classList.add('active');
+    }
+  }
+  renderAll();
+}
+// En el croquis, tocar un punto donde hay varias piezas juntas abre una lista
+// para elegir cuál (hay piezas con la misma coordenada exacta: el zoom no las separa).
+function elegirPiezaCroquis(el){
+  var clicked=map.latLngToContainerPoint([el.geom.lat,el.geom.lng]);
+  var nearby=Object.values(S.elems).filter(function(p){
+    return p.id!==connFirst&&T[p.type]&&p.geom&&p.geom.type==='Point'&&
+      map.latLngToContainerPoint([p.geom.lat,p.geom.lng]).distanceTo(clicked)<=18;
+  });
+  if(nearby.length<=1){actuarSobrePieza(nearby[0]||el);return;}
+  var options=document.createElement('div');
+  options.className='pick-croquis';
+  var title=document.createElement('strong');
+  title.textContent=connMode?'Elegí la pieza para conectar':'Elegí una pieza';
+  options.appendChild(title);
+  var popup=L.popup().setLatLng([el.geom.lat,el.geom.lng]).setContent(options);
+  nearby.forEach(function(piece){
+    var button=document.createElement('button');
+    button.type='button';
+    var system=piece.sistema;
+    var code=piece.cod||(piece.type==='tanque'&&system?'TQ'+system:'');
+    button.textContent=[code,piece.name,piece.type==='tanque'?'':'S'+(system||'—')].filter(Boolean).join(' · ');
+    button.onclick=function(){map.closePopup(popup);actuarSobrePieza(piece);};
+    options.appendChild(button);
+  });
+  popup.openOn(map);
+}
+function actuarSobrePieza(el){
+  if(!el)return;
+  if(connMode){handleConn(el.id);return;}
+  if(JUNC.includes(el.type)&&el.outlets&&el.outlets.length)showJunc(el.id);
+  else if(T[el.type]&&T[el.type].valve)askTog(el.id);
+}
+
+// Desde el croquis, "Satelital" sale del croquis y muestra la foto satelital
+// (si ya estaba elegida, no la da vuelta al mapa común).
+function togLayer(){if(!map)return;if(croquisOn){toggleCroquis();if(satOn)return;}satOn=!satOn;satOn?(map.addLayer(sat),map.removeLayer(osm)):(map.addLayer(osm),map.removeLayer(sat));var b=document.getElementById('btn-sat');if(b)b.classList.toggle('active',satOn);}
 
 // ── TIPOS ──────────────────────────────────────────────────
 var T={
@@ -1111,7 +1190,8 @@ function goTab(name,btn){
   document.querySelectorAll('.pv').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('pv-'+name).classList.add('on');
-  btn.classList.add('active');
+  // con el croquis prendido, la pestaña del mapa que se marca es CROQUIS
+  ((name==='mapa'&&croquisOn&&document.getElementById('btn-croquis'))||btn).classList.add('active');
   if(name==='potreros')renderPot();
   if(name==='historial')renderHist();
   if(name==='config')renderCfg();
@@ -1157,6 +1237,49 @@ function ptInPoly(lat,lng,coords){
   return inside;
 }
 
+// ── SALIDAS DE T Y CRUCES ──────────────────────────────────
+// Regla nueva (v61.8): cada salida se vincula con SU caño (`vecinoId`) y puede
+// llevar llave o no (`tieneLlave`). Una salida con llave cerrada corta el paso
+// por ese caño EN LOS DOS SENTIDOS. Una T o cruz queda "configurada" recién
+// cuando se guardan sus salidas; hasta entonces funciona como antes (salidas
+// repartidas por orden de conexión y corte solo al salir).
+function salidasConfiguradas(el){
+  return !!el&&JUNC.includes(el.type)&&Array.isArray(el.outlets)&&
+    el.outlets.some(function(o){return !!o&&Object.prototype.hasOwnProperty.call(o,'tieneLlave');});
+}
+function salidaBloquea(el,vecinoId){
+  return salidasConfiguradas(el)&&el.outlets.some(function(o){return !!o&&o.vecinoId===vecinoId&&o.tieneLlave&&!o.open;});
+}
+// Código de la llave de una salida: el de la pieza más "-L" y el número de salida (XL2-03-L3)
+function codigoSalida(el,i){
+  return (el&&el.cod&&salidasConfiguradas(el)&&el.outlets[i]&&el.outlets[i].tieneLlave)?el.cod+'-L'+(i+1):'';
+}
+// La salida con llave cerrada que corta el caño entre dos piezas (o null)
+function salidaCerradaEntre(a,b){
+  var r=null;
+  [[a,b],[b,a]].forEach(function(p){
+    var j=p[0];
+    if(r||!j||!p[1]||!salidasConfiguradas(j))return;
+    j.outlets.forEach(function(o,i){
+      if(!r&&o&&o.vecinoId===p[1].id&&o.tieneLlave&&!o.open)
+        r={name:codigoSalida(j,i)||((j.cod||j.name)+' — '+(o.name||'Salida '+(i+1)))};
+    });
+  });
+  return r;
+}
+// A qué salida le toca cada caño cuando la pieza todavía NO está configurada:
+// por orden de conexión (es el reparto que usa el motor viejo). {vecinoId: índice}
+function salidasPorOrden(el){
+  var m={};
+  if(!el||!el.outlets||!el.outlets.length)return m;
+  S.conns.forEach(function(c){
+    var o=c.from===el.id?c.to:(c.to===el.id?c.from:null);
+    if(o==null||m[o]!==undefined||!S.elems[o])return;
+    m[o]=Math.min(Object.keys(m).length,el.outlets.length-1);
+  });
+  return m;
+}
+
 // ── GRAPH ──────────────────────────────────────────────────
 function calcStates(){
   const adj={};
@@ -1185,6 +1308,8 @@ function calcStates(){
         if(e.net!==net&&e.net!=='both')return;
         if(reached.has(e.to))return;
         var el=S.elems[e.to];if(!el)return;
+        // Salida con llave cerrada de una T o cruz configurada: ese caño no pasa, en ningún sentido
+        if(net==='agua'&&(salidaBloquea(S.elems[cur],e.to)||salidaBloquea(el,cur)))return;
         // Desnivel: el agua no sube más alto que la fuente de la que viene
         if(net==='agua'&&techo!==null&&el.cota!=null&&el.cota>techo)return;
         var isPassThrough=JUNC.includes(el.type)&&(!el.outlets||el.outlets.length===0);
@@ -1196,7 +1321,7 @@ function calcStates(){
         // Válvula de retención: el agua la cruza en un solo sentido. Se puede
         // llegar hasta ella desde cualquier lado, pero sólo sale aguas abajo.
         if(curEl&&curEl.type==='valvula_retencion'&&curEl.salidaHacia&&e.to!==curEl.salidaHacia)return;
-        if(curEl&&JUNC.includes(curEl.type)&&curEl.outlets&&curEl.outlets.length>0&&outletMap[cur]){
+        if(curEl&&!salidasConfiguradas(curEl)&&JUNC.includes(curEl.type)&&curEl.outlets&&curEl.outlets.length>0&&outletMap[cur]){
           var oi=outletMap[cur][e.to];
           if(oi!==undefined&&curEl.outlets[oi]&&!curEl.outlets[oi].open)return;
         }
@@ -1397,6 +1522,8 @@ function sugerirCodigo(el,ctx){
       var cb=pend[b.id]||b.cod||sugerirCodigo(b,{usados:usados,red:red,pend:pend});
       if(cb)return codConLetra('LB '+cb.replace(/^B\s+/,''),usados);
     }
+    // "Paso Zanja Caño" es una llave de corte entre S1 y S2, confirmada en el campo por Pedro (11/11/2026)
+    if(/^Paso Zanja Caño(?:\s*\(\d+\))?$/i.test((el.name||'').trim()))return codNumero('L'+codSistemaDe(el,red),usados);
     // cargada como llave pero el nombre dice que es un paso o una unión
     if(/zanja|uni[oó]n/i.test(el.name||''))letra='U';
   }
@@ -1457,6 +1584,9 @@ function describirCodigo(cod){
   if((m=cod.match(/^(L?B) (.+)$/)))return cod+' = '+COD_DESC[m[1]]+' · '+pots(m[2]);
   if((m=cod.match(/^([A-Z]{1,2})(\d)-(\d+)$/))&&COD_DESC[m[1]])
     return cod+' = '+COD_DESC[m[1]]+' · '+nomSis(m[2])+' · número '+parseInt(m[3],10);
+  // la llave de una salida de una T o cruz: XL2-03-L3
+  if((m=cod.match(/^([A-Z]{1,2})(\d)-(\d+)-L(\d+)$/))&&COD_DESC[m[1]])
+    return cod+' = Llave de la salida '+parseInt(m[4],10)+' de '+m[1]+m[2]+'-'+m[3]+' ('+COD_DESC[m[1]]+' · '+nomSis(m[2])+')';
   if((m=cod.match(/^TQ(\d)/)))return cod+' = Tanque · '+nomSis(m[1]);
   if((m=cod.match(/^(BS|BE)\d*$/)))return cod+' = '+COD_DESC[m[1]];
   return cod+' = código propio (no sigue la guía)';
@@ -1547,7 +1677,14 @@ function renderAll(){
       col=flowing?'#ffd54f':'#5d4037';weight=flowing?2.5:1.5;dash=flowing?'none':'8 5';opacity=flowing?.85:.5;
     } else {col='#555';dash='5 5';opacity=.3;}
     if(connFilter!=='all'&&!active){opacity*=0.2;weight=1;}
-    L.polyline([[a.geom.lat,a.geom.lng],[b.geom.lat,b.geom.lng]],{
+    const coords=[[a.geom.lat,a.geom.lng],[b.geom.lat,b.geom.lng]];
+    // Croquis: caño grueso con halo blanco. Azul si lleva agua, rojo si quedó sin suministro.
+    if(croquisOn&&c.net==='agua'&&active){
+      weight=4;opacity=1;
+      col=flowing?'#0369a1':'#b91c1c';
+      L.polyline(coords,{color:'#fff',weight:7,interactive:false}).addTo(elemL);
+    }
+    L.polyline(coords,{
       color:col,weight,opacity,dashArray:dash==='none'?null:dash
     }).addTo(elemL);
   });
@@ -1559,7 +1696,7 @@ function renderAll(){
     // Válvula de agua cerrada pero con presión: semitransparente + tooltip especial
     if(!el.on&&watered.has(el.id)&&ti&&ti.net==='agua'){fo=0.55;}
     if(el.type==='bebedero'){fc=watered.has(el.id)?'#26c6da':'#ef5350';fo=0.85;}
-    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:'#111',fillColor:fc,weight:1.2,fillOpacity:0.18,opacity:0.7}).addTo(elemL);
+    if(el.geom.type==='Polygon')L.polygon(el.geom.coords,{color:'#111',fillColor:croquisOn?'#dce4d4':fc,weight:croquisOn?0.85:1.2,fillOpacity:croquisOn?0.2:0.18,opacity:0.7}).addTo(elemL);
     let m;
     if(el.type==='potrero'){
       const icon=L.divIcon({className:'pot-label',html:`<div class="pot-lbl" style="color:${fc};transform:translate(-50%,-50%)">${el.name}</div>`,iconSize:[0,0],iconAnchor:[0,0]});
@@ -1570,11 +1707,16 @@ function renderAll(){
       const ss=el.salidas?` · ${el.salidas} sal`:'';
       const llegando=(!el.on&&watered.has(el.id)&&ti.net==='agua')?' 💧llegando':'';
       const ctip=el.cota!=null?` · ${el.cota}m`:''; 
-      m.bindTooltip(`${ti.ico} ${etq(el)}${vs}${ss}${llegando}${ctip}`,{direction:'top',offset:[0,-8]});
+      // Croquis: donde hay varias piezas en la misma coordenada exacta, un solo cartel fijo avisa que hay que elegir
+      const apiladas=croquisOn?Object.values(S.elems).filter(p=>T[p.type]&&p.geom&&p.geom.type==='Point'&&p.geom.lat===el.geom.lat&&p.geom.lng===el.geom.lng):[];
+      if(apiladas.length<=1)m.bindTooltip(`${ti.ico} ${etq(el)}${vs}${ss}${llegando}${ctip}`,{direction:'top',offset:[0,-8]});
+      else if(apiladas[apiladas.length-1].id===el.id)m.bindTooltip(apiladas.length+' piezas · tocá para elegir',{permanent:true,direction:'top',offset:[0,-8],className:'apiladas-tip'});
       // Etiqueta fija con el código, debajo del marcador (se oculta con el botón 🏷 o con el mapa lejos)
       if(el.cod)L.marker([el.geom.lat,el.geom.lng],{interactive:false,keyboard:false,icon:L.divIcon({className:'cod-ico',html:`<div class="cod-lbl">${el.cod}</div>`,iconSize:[0,0],iconAnchor:[0,0]})}).addTo(elemL);
     }
-    m.on('click',function(ev){if(connMode){L.DomEvent.stopPropagation(ev);handleConn(el.id);return;}if(JUNC.includes(el.type)&&el.outlets&&el.outlets.length>0)showJunc(el.id);else if(ti&&ti.valve)askTog(el.id);});
+    // En modo mover / agregar / dibujar / editar potrero el toque es para el MAPA (ahí se mueve o agrega):
+    // la pieza no hace nada ni frena el toque. Antes abría además la ventana de la llave tocada.
+    m.on('click',function(ev){if(moveMode||addMode||drawMode||editPotMode)return;if(croquisOn&&el.geom.type==='Point'){L.DomEvent.stopPropagation(ev);elegirPiezaCroquis(el);return;}if(connMode){L.DomEvent.stopPropagation(ev);handleConn(el.id);return;}if(JUNC.includes(el.type)&&el.outlets&&el.outlets.length>0)showJunc(el.id);else if(ti&&ti.valve)askTog(el.id);});
     m.addTo(elemL);
     _count++;
   });
@@ -1601,13 +1743,19 @@ function renderLlaves(en,wa){
   d.innerHTML=ll.map(el=>{
     const ti=T[el.type];const isJunc=JUNC.includes(el.type)&&el.outlets;const isSrc=ti?.src;
     if(isJunc){
+      const cfg=salidasConfiguradas(el);
       const juncRows=el.outlets.map((o,i)=>{
+        // Pieza configurada: una salida sin llave es paso libre, y una con llave pero sin caño
+        // vinculado no corta nada: ninguna de las dos es una llave operable
+        if(cfg&&(!o.tieneLlave||!o.vecinoId))return '';
         const isWater=ti.net==='agua'||ti.net==='both';
         const flowing=(isWater?wa:en).has(el.id)&&o.open;
+        const haciaEl=cfg&&o.vecinoId?S.elems[o.vecinoId]:null;
+        const hacia=haciaEl?' → '+(haciaEl.cod||haciaEl.name):'';
         return `<div class="ei" style="padding:6px 8px 6px 14px;border-left:2px solid ${o.open?'#42a5f5':'#ef5350'}" onclick="toggleOutlet('${el.id}',${i})">
           <span class="ei-ico" style="font-size:12px;color:${o.open?'#42a5f5':'#ef5350'}">${isWater?'🚰':'🔌'}</span>
           <div class="ei-info">
-            <div class="ei-name" style="font-size:11px">${etq(el)} — ${o.name||'Sal.'+(i+1)}</div>
+            <div class="ei-name" style="font-size:11px">${codigoSalida(el,i)||(etq(el)+' — '+(o.name||'Sal.'+(i+1)))}${hacia}</div>
             <div class="ei-sub">${ti.lbl} · S${el.sistema||1} · ${flowing?'💧 FLUYE':'⛔ CORTADA'}</div>
           </div>
           <button class="vbtn ${o.open?'vo':'vc'}" onclick="event.stopPropagation();toggleOutlet('${el.id}',${i})">${o.open?'ABIERTA':'CERRADA'}</button>
@@ -1662,6 +1810,9 @@ function llaveCulpable(bebId){
     for(var i=0;i<(adj[x]||[]).length;i++){
       var y=adj[x][i]; if(vis.has(y))continue;
       var el=S.elems[y]; if(!el)continue;
+      // el caño entre x e y está cortado por la salida cerrada de una T o cruz: esa es la llave
+      var sal=salidaCerradaEntre(S.elems[x],el);
+      if(sal) return sal;
       vis.add(y);
       if(T[el.type]&&T[el.type].valve&&!el.on) return el;  // la primera cerrada saliendo del bebedero
       q.push(y);
@@ -1960,7 +2111,9 @@ function renderBuscar(){
   var d=document.getElementById('buscar-res');
   if(!q){d.innerHTML='';return;}
   var res=Object.values(S.elems).filter(function(e){
-    return e.geom&&((e.cod||'').toLowerCase().indexOf(q)>=0||(e.name||'').toLowerCase().indexOf(q)>=0);
+    // "xl2-03-l3" (la llave de una salida) encuentra su pieza, XL2-03
+    return e.geom&&((e.cod||'').toLowerCase().indexOf(q)>=0||(e.name||'').toLowerCase().indexOf(q)>=0||
+      (!!e.cod&&q.indexOf(e.cod.toLowerCase()+'-l')===0));
   }).sort(function(a,b){
     var pa=(a.cod||'').toLowerCase().indexOf(q)===0?0:1,pb=(b.cod||'').toLowerCase().indexOf(q)===0?0:1;
     return (pa-pb)||etq(a).localeCompare(etq(b),'es',{numeric:true});
@@ -1985,8 +2138,8 @@ function imprimirPiezas(){
       return ((a.cod?0:1)-(b.cod?0:1))||etq(a).localeCompare(etq(b),'es',{numeric:true});
     });
   var guia=['B|Bebedero. Lleva el nombre del potrero: B 12. En un alambrado: B 15-18',
-    'LB|Llave de un bebedero: LB 12','L|Llave de corte','TL|T con llave','T|T sin llave',
-    'XL|Cruz con llave','X|Cruz sin llave','U|Unión o paso de zanja','VR|Válvula de retención',
+    'LB|Llave de un bebedero: LB 12','L|Llave de corte','TL|T con llave. TL2-04-L1 identifica la llave de la salida 1','T|T sin llave',
+    'XL|Cruz con llave. XL2-03-L3 identifica la llave de la salida 3','X|Cruz sin llave','U|Unión o paso de zanja','VR|Válvula de retención',
     'TQ|Tanque','BS · BE|Bomba solar · Bomba eléctrica'];
   var h='<h1>Piezas de la red de agua y electricidad</h1>'+
     '<p>'+new Date().toLocaleDateString('es-UY')+' · '+piezas.length+' piezas · '+piezas.filter(function(e){return !e.cod;}).length+' sin código</p>'+
@@ -1997,8 +2150,15 @@ function imprimirPiezas(){
     '<table><tr><th>Código</th><th>Qué es</th><th>Potrero</th><th>Sist.</th><th>Nombre o descripción</th><th>Cota</th><th>Marcada ✔</th></tr>'+
     piezas.map(function(e){
       var pots=(e.geom&&e.geom.type==='Point')?codPotrerosDe(e.geom.lat,e.geom.lng):[];
+      // una fila más por cada salida con llave de una T o cruz configurada: es otra llave para marcar en el campo
+      var salidas=salidasConfiguradas(e)?e.outlets.map(function(o,i){
+        var cs=codigoSalida(e,i);if(!cs)return '';
+        var v=o.vecinoId?S.elems[o.vecinoId]:null;
+        return '<tr><td class="c">'+cs+'</td><td>Llave de salida '+(i+1)+'</td><td>'+pots.join(' / ')+'</td><td>'+(e.sistema||'')+
+          '</td><td>'+(v?'hacia '+(v.cod||v.name):'sin caño vinculado')+'</td><td></td><td></td></tr>';
+      }).join(''):'';
       return '<tr><td class="c">'+(e.cod||'—')+'</td><td>'+T[e.type].lbl+'</td><td>'+pots.join(' / ')+'</td><td>'+(e.sistema||'')+
-        '</td><td>'+(e.name&&e.name!==e.cod?e.name:'')+'</td><td>'+(e.cota!=null?e.cota+' m':'')+'</td><td></td></tr>';
+        '</td><td>'+(e.name&&e.name!==e.cod?e.name:'')+'</td><td>'+(e.cota!=null?e.cota+' m':'')+'</td><td></td></tr>'+salidas;
     }).join('')+'</table>';
   var pa=document.getElementById('print-area');
   pa.innerHTML=h;
@@ -2143,8 +2303,8 @@ function saveElem(){
       var newOutlets=[];
       for(var i=0;i<n;i++){
         if(prev[i]){
-          // Preservar nombre y estado existente
-          newOutlets.push({open:prev[i].open,name:prev[i].name});
+          // Preservar la salida entera: nombre, estado, caño vinculado y si lleva llave
+          newOutlets.push({...prev[i]});
         } else {
           // Nueva salida
           newOutlets.push({open:true,name:'Salida '+(i+1)});
@@ -2178,7 +2338,8 @@ function locateElem(id){
   document.querySelectorAll('.pv').forEach(function(p){p.classList.remove('on');});
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   document.getElementById('pv-mapa').classList.add('on');
-  document.querySelector('.tab').classList.add('active');
+  // con el croquis prendido la pestaña activa es CROQUIS, no MAPA
+  (croquisOn&&document.getElementById('btn-croquis')||document.querySelector('.tab')).classList.add('active');
   // Centrar mapa
   var lat=el.geom.lat, lng=el.geom.lng;
   map.setView([lat,lng],17,{animate:true});
@@ -2231,6 +2392,12 @@ function autoInsertInConn(newId, ll){
   // Crear dos conexiones: from→nuevo y nuevo→to
   S.conns.push({id:uid(),from:fromId,to:newId,net:net});
   S.conns.push({id:uid(),from:newId,to:toId,net:net});
+  // Si una punta es una T o cruz configurada, su salida apuntaba a la otra punta:
+  // ahora el caño de esa salida llega a la pieza nueva. Sin esto la llave dejaría de cortar.
+  [[fromId,toId],[toId,fromId]].forEach(function(p){
+    var j=S.elems[p[0]];
+    if(j&&salidasConfiguradas(j))j.outlets.forEach(function(o){if(o&&o.vecinoId===p[1])o.vecinoId=newId;});
+  });
   addHist('Auto','Insertó "'+el.name+'" en línea '+fromName+' ↔ '+toName,'Red: '+net);
   showToast('🔗','Insertado en red','"'+el.name+'" conectado en la línea '+fromName+' ↔ '+toName);
 }
@@ -2454,7 +2621,7 @@ function startEditPot(id){
   document.querySelectorAll('.pv').forEach(function(p){p.classList.remove('on');});
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   document.getElementById('pv-mapa').classList.add('on');
-  document.querySelector('.tab').classList.add('active');
+  (croquisOn&&document.getElementById('btn-croquis')||document.querySelector('.tab')).classList.add('active');
   try{var bnd=L.polygon(el.geom.coords).getBounds();if(bnd.isValid())map.fitBounds(bnd,{padding:[60,60]});}catch(e){}
   editPotLayer=L.layerGroup().addTo(map);
   buildEditPotMarkers();
@@ -2623,42 +2790,135 @@ function showJunc(id){
     return;
   }
   document.getElementById('mj-title').textContent=ti.ico+' '+etq(el);
+  delete salidasBorrador[id]; // al abrir la ventana se muestra lo guardado, no un borrador viejo
   renderJuncOutlets(id);
   document.getElementById('m-junc').classList.add('on');
 }
 
+// Lo que se eligió en la ventana de salidas y todavía no se guardó. Abrir o cerrar
+// una salida (o renombrarla) vuelve a dibujar la ventana: sin esto se perdería.
+var salidasBorrador={};
 function renderJuncOutlets(id){
   const el=S.elems[id];if(!el)return;
-  const{watered,energized}=calcStates();
+  if(!el.outlets||!el.outlets.length)return;
+  const{watered}=calcStates();
   const d=document.getElementById('mj-outlets');
-  d.innerHTML=el.outlets.map((o,i)=>{
-    const isWater=T[el.type]?.net==='agua'||T[el.type]?.net==='both';
-    const flowing=isWater?watered.has(id):energized.has(id);
-    const canFlow=flowing&&o.open;
-    const stateIco=canFlow?'💧':'🚫';
-    return `<div class="outlet-row">
-      <div class="outlet-ico" style="color:${o.open?'#42a5f5':'#ef5350'}">${isWater?'🚰':'🔌'}</div>
-      <div class="outlet-info">
-        <div class="outlet-name">${o.name||'Salida '+(i+1)}</div>
-        <div class="outlet-sub">${o.open?stateIco+' FLUYE':'⛔ CORTADA'}</div>
-      </div>
-      <div class="outlet-actions">
-        <button class="outlet-rename" onclick="renameOutlet('${id}',${i})" title="Renombrar">✏️</button>
-        <button class="outlet-btn ${o.open?'ob-open':'ob-closed'}" onclick="toggleOutlet('${id}',${i})">${o.open?'ABIERTA':'CERRADA'}</button>
-      </div>
-    </div>`;
-  }).join('');
+  const cfg=salidasConfiguradas(el);
+  // Los caños que llegan a esta pieza
+  const vecinos=[];
+  S.conns.forEach(c=>{
+    const o=c.from===id?c.to:(c.to===id?c.from:null);
+    if(o&&o!==id&&S.elems[o]&&!vecinos.includes(o))vecinos.push(o);
+  });
+  // Sin configurar: se propone el reparto por orden de conexión, que es el que usa hoy el motor
+  const porOrden=cfg?{}:salidasPorOrden(el);
+  const llaveDefecto=el.type==='llave_t'||el.type==='llave_x';
+  const form=document.createElement('form');
+  form.className='cruz-salidas';
+  const aviso=document.createElement('div');
+  aviso.className='cs-nota';aviso.style.marginBottom='8px';
+  aviso.textContent=cfg
+    ?'Cada salida con llave corta su caño en los dos sentidos.'
+    :'Todavía sin guardar: funciona como antes. Revisá a qué caño va cada salida, marcá cuáles llevan llave y tocá Guardar salidas.';
+  form.appendChild(aviso);
+  const rows=el.outlets.map((outlet,i)=>{
+    const row=document.createElement('fieldset');
+    const title=document.createElement('legend');
+    const codigo=codigoSalida(el,i);
+    title.textContent=(outlet.name||'Salida '+(i+1))+(codigo?' · '+codigo:'');
+    const ren=document.createElement('button');
+    ren.type='button';ren.className='cs-ren';ren.title='Renombrar';ren.textContent='✏️';
+    ren.onclick=()=>renameOutlet(id,i);
+    title.appendChild(ren);
+    const select=document.createElement('select');
+    select.setAttribute('aria-label','Caño de salida '+(i+1));
+    select.add(new Option('Sin vincular',''));
+    vecinos.forEach(v=>select.add(new Option(etq(S.elems[v]),v)));
+    const sugerido=vecinos.find(v=>porOrden[v]===i)||'';
+    select.value=cfg?(vecinos.includes(outlet.vecinoId)?outlet.vecinoId:''):sugerido;
+    const lleva=cfg?!!outlet.tieneLlave:(llaveDefecto||!outlet.open);
+    const check=document.createElement('input');
+    check.type='checkbox';check.checked=lleva;
+    // si hay un borrador sin guardar, manda lo que el usuario ya había elegido
+    const borr=salidasBorrador[id]&&salidasBorrador[id][i];
+    if(borr){ if(borr.sel===''||vecinos.includes(borr.sel))select.value=borr.sel; check.checked=borr.chk; }
+    const label=document.createElement('label');
+    label.append(check,'Lleva llave');
+    row.append(title,select,label);
+    // Sin configurar, todas las salidas se abren y cierran como siempre
+    if(cfg?(lleva&&!!outlet.vecinoId):true){
+      const state=document.createElement('button');
+      state.type='button';
+      state.className='cs-estado'+(outlet.open?'':' cerrada');
+      state.textContent=outlet.open?'Abierta · cerrar':'Cerrada · abrir';
+      state.onclick=()=>toggleOutlet(id,i);
+      row.append(state);
+    }else if(cfg&&lleva){
+      const falta=document.createElement('div');
+      falta.className='cs-nota';falta.textContent='Elegí el caño y guardá para poder abrirla y cerrarla.';
+      row.append(falta);
+    }
+    if(cfg&&outlet.vecinoId&&S.elems[outlet.vecinoId]){
+      const info=document.createElement('div');
+      info.className='cs-nota';
+      info.textContent=watered.has(outlet.vecinoId)?'💧 El ramal recibe agua':'🚫 El ramal no recibe agua';
+      row.append(info);
+    }
+    form.append(row);
+    return {select,check};
+  });
+  const guardarBorrador=()=>{
+    salidasBorrador[id]=rows.map(r=>({sel:r.select.value,chk:r.check.checked}));
+    avisarLibres();
+  };
+  rows.forEach(r=>{r.select.onchange=guardarBorrador;r.check.onchange=guardarBorrador;});
+  // Caños que no quedan en ninguna salida: después de guardar pasan sin llave (paso libre).
+  // Lo normal es que sea el caño por donde LLEGA el agua; si no, hay que vincularlo.
+  const libres=document.createElement('div');
+  libres.className='cs-nota';libres.style.margin='0 0 8px';
+  const avisarLibres=()=>{
+    const usados=rows.map(r=>r.select.value).filter(Boolean);
+    const sueltos=vecinos.filter(v=>!usados.includes(v));
+    libres.textContent=sueltos.length
+      ?'Sin salida (pasan libres, sin llave): '+sueltos.map(v=>{const p=S.elems[v];return p.cod||p.name;}).join(', ')+'. Suele ser el caño por donde llega el agua.'
+      :'';
+    libres.style.display=sueltos.length?'block':'none';
+  };
+  avisarLibres();
+  form.append(libres);
+  const saveButton=document.createElement('button');
+  saveButton.className='cs-guardar';
+  saveButton.textContent='Guardar salidas';
+  form.append(saveButton);
+  form.onsubmit=event=>{
+    event.preventDefault();
+    const ids=rows.map(r=>r.select.value).filter(Boolean);
+    if(new Set(ids).size!==ids.length){showToast('⚠️','Caño repetido','Elegí un caño distinto para cada salida.');return;}
+    el.outlets=rows.map((r,i)=>({
+      ...el.outlets[i],vecinoId:r.select.value,tieneLlave:r.check.checked,
+      open:r.check.checked?el.outlets[i].open:true
+    }));
+    delete salidasBorrador[id];
+    addHist('Config','Configuró salidas de '+etq(el),'');
+    save();
+    renderAll();
+    renderJuncOutlets(id);
+  };
+  d.replaceChildren(form);
 }
 
 function toggleOutlet(id,idx){
-  const el=S.elems[id];if(!el||!el.outlets)return;
+  const el=S.elems[id];if(!el||!el.outlets||!el.outlets[idx])return;
+  // En una pieza configurada, una salida sin llave (o sin caño vinculado) no corta nada: no hay qué cerrar
+  if(salidasConfiguradas(el)&&(!el.outlets[idx].tieneLlave||!el.outlets[idx].vecinoId))return;
   el.outlets[idx].open=!el.outlets[idx].open;
   const nowOpen=el.outlets[idx].open;
   const outName=el.outlets[idx].name||'Salida '+(idx+1);
-  addHist('Op',`${nowOpen?'Abrió':'Cerró'} "${el.name}" - Salida ${idx+1}`);
+  const cs=codigoSalida(el,idx);
+  addHist('Op',`${nowOpen?'Abrió':'Cerró'} "${el.name}" - Salida ${idx+1}${cs?' ('+cs+')':''}`);
   vibrate(nowOpen?60:[30,15,30]);
   renderJuncOutlets(id);renderAll();save();
-  showResultReport(`${nowOpen?'🔓 ABIERTA':'🔒 CERRADA'}: ${el.name.toUpperCase()} — ${outName}`,T[el.type].net);
+  showResultReport(`${nowOpen?'🔓 ABIERTA':'🔒 CERRADA'}: ${cs||(el.name.toUpperCase()+' — '+outName)}`,T[el.type].net);
 }
 
 // ── RENAME OUTLET (reemplaza prompt) ──────────────────────
@@ -2902,7 +3162,7 @@ async function importJSON(inp){
     document.querySelectorAll('.pv').forEach(function(p){p.classList.remove('on');});
     document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
     document.getElementById('pv-mapa').classList.add('on');
-    document.querySelector('.tab').classList.add('active');
+    (croquisOn&&document.getElementById('btn-croquis')||document.querySelector('.tab')).classList.add('active');
     // Centrar mapa con guards
     var pts2=Object.values(S.elems).filter(function(e){return e.geom&&e.geom.lat;});
     if(pts2.length && map && typeof map.setView==='function'){
@@ -3211,6 +3471,8 @@ initSchema();
       S.conns=S.conns.filter(function(c){return c.id!==cn.id;});
       S.conns.push({id:uid(),from:otherId,to:lid,net:cn.net});
       S.conns.push({id:uid(),from:lid,to:beb.id,net:cn.net});
+      // si la otra punta es una T o cruz configurada, su salida ahora llega a la llave nueva
+      if(salidasConfiguradas(other))other.outlets.forEach(function(o){if(o&&o.vecinoId===beb.id)o.vecinoId=lid;});
       changed=true;
     });
   });

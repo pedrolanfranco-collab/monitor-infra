@@ -28,7 +28,7 @@ function extraer(n){
     else if (HTML[k] === '}') { d--; if (!d) return HTML.slice(i, k + 1); }
   }
 }
-const MOTOR = extraer('calcStates') + '\n' + extraer('ptInPoly');
+const MOTOR = ['salidasConfiguradas', 'salidaBloquea', 'calcStates', 'ptInPoly'].map(f => extraer(f)).join('\n');
 
 const ORIGEN = JSON.parse(fs.readFileSync(process.argv[2] || 'C:/Users/Pedro/Downloads/monitor_infra_CON_COTAS.json', 'utf8'));
 

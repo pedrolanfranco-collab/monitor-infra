@@ -20,7 +20,7 @@ const HTML = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const ex = n => { const i = HTML.indexOf('function ' + n + '('); let d = 0;
   for (let k = HTML.indexOf('{', i); k < HTML.length; k++) {
     if (HTML[k] === '{') d++; else if (HTML[k] === '}') { d--; if (!d) return HTML.slice(i, k + 1); } } };
-const MOTOR = ex('calcStates') + '\n' + ex('ptInPoly');
+const MOTOR = ['salidasConfiguradas', 'salidaBloquea', 'calcStates', 'ptInPoly'].map(ex).join('\n');
 
 const ORIGEN = JSON.parse(fs.readFileSync(
   process.argv[2] || 'C:/Users/Pedro/Downloads/monitor_infra_CON_COTAS.json', 'utf8'));
