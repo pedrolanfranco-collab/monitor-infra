@@ -3446,38 +3446,8 @@ initSchema();
   if(cambio){ save(); console.log('[Migración] válvulas de retención con sentido'); }
 })();
 
-(function migrateBebLlaves(){
-  var changed=false;
-  var VALVE_T=['llave_agua','llave_elec'];
-  Object.values(S.elems).forEach(function(beb){
-    if(beb.type!=='bebedero'||!beb.geom||beb.geom.type==='Polygon')return;
-    var conns=S.conns.filter(function(c){return c.from===beb.id||c.to===beb.id;});
-    if(!conns.length)return;
-    var hasValve=conns.some(function(cn){
-      var oid=cn.to===beb.id?cn.from:cn.to;
-      return VALVE_T.includes((S.elems[oid]||{}).type);
-    });
-    if(hasValve)return;
-    conns.forEach(function(cn){
-      var otherId=cn.to===beb.id?cn.from:cn.to;
-      var other=S.elems[otherId];
-      if(!other||other.type==='bebedero'||!other.geom)return;
-      var lat=beb.geom.lat+(other.geom.lat-beb.geom.lat)*0.33;
-      var lng=beb.geom.lng+(other.geom.lng-beb.geom.lng)*0.33;
-      var lid=uid();
-      S.elems[lid]={id:lid,type:'llave_agua',name:'Llave '+beb.name,
-        sistema:beb.sistema||1,on:true,salidas:null,outlets:null,
-        geom:{type:'Point',lat:lat,lng:lng},fromKMZ:false};
-      S.conns=S.conns.filter(function(c){return c.id!==cn.id;});
-      S.conns.push({id:uid(),from:otherId,to:lid,net:cn.net});
-      S.conns.push({id:uid(),from:lid,to:beb.id,net:cn.net});
-      // si la otra punta es una T o cruz configurada, su salida ahora llega a la llave nueva
-      if(salidasConfiguradas(other))other.outlets.forEach(function(o){if(o&&o.vecinoId===beb.id)o.vecinoId=lid;});
-      changed=true;
-    });
-  });
-  if(changed){save();console.log('[Mig] Llaves bebedero agregadas');}
-})();
+// v61.8: se sacó la regla vieja (migrateBebLlaves) que creaba sola una llave
+// al lado de cada bebedero conectado sin llave. Las llaves las carga Pedro a mano.
 
 // Migración: outlets para junctions sin ellos
 (function migrate(){
