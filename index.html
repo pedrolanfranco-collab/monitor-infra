@@ -2896,7 +2896,9 @@ function dibujoPieza(id){
     svg+='<line x1="'+cx+'" y1="'+cy+'" x2="'+x+'" y2="'+y+'" stroke="'+col+'" stroke-width="'+(it.tapon?2:4)+'"'+(conAgua?'':' stroke-dasharray="7 5"')+' stroke-linecap="round"/>';
     // etiqueta de la salida sobre el caño
     if(it.sal!=null){
-      var o=el.outlets[it.sal]||{},lleva=cfg?!!o.tieneLlave:true;
+      // Sin configurar: lleva llave si la pieza es una T o cruz CON llave, o si esa salida está cerrada
+      // (mismo criterio que la casilla "Lleva llave" de la ventana). Una T sin llave muestra S, no L.
+      var o=el.outlets[it.sal]||{},lleva=cfg?!!o.tieneLlave:(el.type==='llave_t'||el.type==='llave_x'||!o.open);
       var dudosa=!cfg&&(it.entrada||usoSal[it.sal]>1);
       var fill=!lleva?'#455a64':(o.open?'#2e7d32':'#c62828');
       var pe=puntoEtiquetaDib(cx,cy,x,y),tx=pe[0],ty=pe[1];
