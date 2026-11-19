@@ -284,6 +284,10 @@ body{display:flex;flex-direction:column}
 .mbox.wide{max-width:400px}
 /* Dibujo de la pieza (v61.9) */
 #m-junc .mbox,#m-tog .mbox{max-width:420px;max-height:92vh;overflow:auto}
+#m-lugar .mbox{max-width:480px;max-height:92vh;overflow:auto}
+.lug-lista button{display:block;width:100%;margin-top:6px;padding:7px 9px;text-align:left;cursor:pointer;border:1px solid var(--brd2);border-radius:6px;background:var(--surf2);color:var(--txt);font-family:var(--sans);font-size:12.5px}
+.lug-lista button:hover{background:var(--surf3)}
+.lug-pieza:hover rect,.lug-ext[data-abrir]:hover rect{stroke:#ffb300}
 .dib{margin:0 0 10px}
 .dib svg{display:block;width:100%;height:auto;background:var(--bg2);border:1px solid var(--brd);border-radius:8px;font-family:var(--sans)}
 .dib-ley{font-size:10.5px;color:var(--txt2);margin-top:4px;line-height:1.4}
@@ -754,6 +758,19 @@ body{display:flex;flex-direction:column}
   </div>
 </div>
 
+<!-- MODAL: Diagrama de un lugar con varias piezas juntas (v61.9) -->
+<div class="modal" id="m-lugar">
+  <div class="mbox">
+    <h2 id="ml-title">PIEZAS EN ESTE LUGAR</h2>
+    <p style="font-size:11px;color:var(--txt2);margin-bottom:8px">Están tan juntas que en el mapa se ven como un solo punto. Tocá una pieza del dibujo (o de la lista) para abrirla.</p>
+    <div id="ml-dib"></div>
+    <div id="ml-lista" class="lug-lista"></div>
+    <div class="mac" style="margin-top:10px">
+      <button class="m-cn" onclick="closeM('m-lugar')" style="flex:1">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: PIN (confirmar borrados) -->
 <div class="modal" id="m-pin">
   <div class="mbox">
@@ -972,12 +989,10 @@ function toggleCroquis(){
 // En el croquis, tocar un punto donde hay varias piezas juntas abre una lista
 // para elegir cuál (hay piezas con la misma coordenada exacta: el zoom no las separa).
 function elegirPiezaCroquis(el){
-  var clicked=map.latLngToContainerPoint([el.geom.lat,el.geom.lng]);
-  var nearby=Object.values(S.elems).filter(function(p){
-    return p.id!==connFirst&&T[p.type]&&p.geom&&p.geom.type==='Point'&&
-      map.latLngToContainerPoint([p.geom.lat,p.geom.lng]).distanceTo(clicked)<=18;
-  });
+  var nearby=piezasJuntas(el);
   if(nearby.length<=1){actuarSobrePieza(nearby[0]||el);return;}
+  // v61.9: fuera del modo conectar, varias piezas juntas abren el diagrama del lugar
+  if(!connMode&&nearby.length<=LUG_MAX){mostrarLugar(nearby);return;}
   var options=document.createElement('div');
   options.className='pick-croquis';
   var title=document.createElement('strong');
@@ -1722,7 +1737,7 @@ function renderAll(){
     }
     // En modo mover / agregar / dibujar / editar potrero el toque es para el MAPA (ahí se mueve o agrega):
     // la pieza no hace nada ni frena el toque. Antes abría además la ventana de la llave tocada.
-    m.on('click',function(ev){if(moveMode||addMode||drawMode||editPotMode)return;if(croquisOn&&el.geom.type==='Point'){L.DomEvent.stopPropagation(ev);elegirPiezaCroquis(el);return;}if(connMode){L.DomEvent.stopPropagation(ev);handleConn(el.id);return;}if(JUNC.includes(el.type)&&el.outlets&&el.outlets.length>0)showJunc(el.id);else if(ti&&ti.valve)askTog(el.id);});
+    m.on('click',function(ev){if(moveMode||addMode||drawMode||editPotMode)return;if(croquisOn&&el.geom.type==='Point'){L.DomEvent.stopPropagation(ev);elegirPiezaCroquis(el);return;}if(connMode){L.DomEvent.stopPropagation(ev);handleConn(el.id);return;}if(el.geom.type==='Point'){const juntas=piezasJuntas(el);if(juntas.length>1&&juntas.length<=LUG_MAX){L.DomEvent.stopPropagation(ev);mostrarLugar(juntas);return;}}if(JUNC.includes(el.type)&&el.outlets&&el.outlets.length>0)showJunc(el.id);else if(ti&&ti.valve)askTog(el.id);});
     m.addTo(elemL);
     _count++;
   });
@@ -2939,6 +2954,178 @@ function dibujoPieza(id){
   if(extra.length)html+='<div class="dib-ley">También conecta con: '+extra.map(function(i){return escDib(i.tapon?'Salida '+(i.sal+1):etq(i.v));}).join(', ')+'.</div>';
   if(avisos.length)html+='<div class="dib-aviso">⚠ '+avisos.map(escDib).join(' ')+'</div>';
   return html+'</div>';
+}
+
+// ── DIAGRAMA DE UN LUGAR CON VARIAS PIEZAS (v61.9) ─────────
+// Cuando varias piezas están tan juntas que en el mapa se ven como un solo
+// punto, tocar ahí abre este diagrama: las piezas del lugar en el medio (en su
+// posición relativa real), los caños entre ellas y alrededor, hacia su rumbo
+// real, lo que conectan afuera. Tocar una pieza abre su ventana de siempre.
+var LUG_EXT=[[220,24],[385,52],[385,160],[385,268],[220,296],[55,268],[55,160],[55,52]];
+var LUG_MAX=6; // con más piezas juntas que esto, mejor acercar el mapa: se muestra la lista
+// Como repartirDib pero con m lugares parejos alrededor (0 = norte, horario)
+function repartirEn(items,m){
+  var libre=[],pares=[],paso=360/m;
+  for(var s=0;s<m;s++)libre.push(true);
+  var dif=function(a,b){var x=Math.abs(a-b)%360;return x>180?360-x:x;};
+  items.forEach(function(it,i){if(it.ang!=null)for(var s=0;s<m;s++)pares.push([dif(it.ang,s*paso),i,s]);});
+  pares.sort(function(a,b){return a[0]-b[0];});
+  pares.forEach(function(p){var it=items[p[1]];if(it.slot==null&&libre[p[2]]){it.slot=p[2];libre[p[2]]=false;}});
+  items.forEach(function(it){
+    if(it.slot!=null)return;
+    var mejor=null,dist=-1;
+    for(var s=0;s<m;s++){
+      if(!libre[s])continue;
+      var d=99;for(var t=0;t<m;t++)if(!libre[t])d=Math.min(d,Math.min(Math.abs(s-t),m-Math.abs(s-t)));
+      if(d>dist){dist=d;mejor=s;}
+    }
+    if(mejor!=null){it.slot=mejor;libre[mejor]=false;}
+  });
+}
+// Qué salida de una T o cruz es el caño hacia otroId (o null)
+function salidaHacia(el,otroId){
+  if(!(JUNC.includes(el.type)&&el.outlets&&el.outlets.length))return null;
+  if(salidasConfiguradas(el)){var r=null;el.outlets.forEach(function(o,i){if(o&&o.vecinoId===otroId)r=i;});return r;}
+  var po=salidasPorOrden(el);return po[otroId]!==undefined?po[otroId]:null;
+}
+function etiquetaSalidaDib(el,i,x,y){
+  var cfg=salidasConfiguradas(el),o=el.outlets[i]||{};
+  var lleva=cfg?!!o.tieneLlave:(el.type==='llave_t'||el.type==='llave_x'||!o.open);
+  var fill=!lleva?'#455a64':(o.open?'#2e7d32':'#c62828');
+  return '<g class="dib-sal" data-sal="'+(i+1)+'" data-de="'+escDib(el.id)+'"><rect x="'+(x-15)+'" y="'+(y-9)+'" width="30" height="18" rx="4" fill="'+fill+'" stroke="#0b1a0d"/>'+
+    '<text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">'+(lleva?'L':'S')+(i+1)+'</text></g>';
+}
+// Punto t (0..1) donde un caño de a hacia b sale de una caja de medio tamaño (hw,hh) centrada en a
+function salidaDeCaja(a,b,hw,hh){var ax=Math.abs(b[0]-a[0])||1e-9,ay=Math.abs(b[1]-a[1])||1e-9;return Math.min(hw/ax,hh/ay);}
+function sePuedeAbrir(e){return !!e&&((JUNC.includes(e.type)&&e.outlets&&e.outlets.length)||(T[e.type]&&T[e.type].valve));}
+function dibujoLugar(ids){
+  var set={};ids.forEach(function(i){set[i]=1;});
+  var inner=ids.map(function(i){return S.elems[i];}).filter(Boolean);
+  if(!inner.length)return '';
+  var w=calcStates().watered,nBase=bebederosConAgua(w);
+  var lat=0,lng=0;inner.forEach(function(e){lat+=e.geom.lat;lng+=e.geom.lng;});lat/=inner.length;lng/=inner.length;
+  var centro={geom:{type:'Point',lat:lat,lng:lng}};
+  // Lo de afuera que sigue con agua sin los caños del lugar: por ahí entra el agua
+  var orig=S.conns,sin;
+  try{S.conns=orig.filter(function(c){return !set[c.from]&&!set[c.to];});sin=calcStates().watered;}finally{S.conns=orig;}
+  // Piezas del lugar: en su rumbo real desde el centro del lugar (las que están en el mismo punto, repartidas)
+  // Medidas pensadas para que las cajas del medio no toquen las de afuera (x 5..105 y 335..435)
+  var cx=220,cy=160,RX=56,RY=50,IHW=54,IHH=17,pos={};
+  var its=inner.map(function(e){var r=rumboDib(centro,e);return {e:e,ang:r.d!=null&&r.d>=0.02?r.ang:null};});
+  if(its.length===1)pos[its[0].e.id]=[cx,cy];
+  else if(its.length<=4){
+    // hasta 4: en rombo (norte, este, sur, oeste), cada una lo más cerca de su rumbo real
+    repartirEn(its,4);
+    its.forEach(function(it){var a=it.slot*Math.PI/2;pos[it.e.id]=[cx+RX*Math.sin(a),cy-RY*Math.cos(a)];});
+  }else{
+    // 5 o 6: dos columnas, las del norte arriba y las del oeste a la izquierda
+    var orden=inner.slice().sort(function(a,b){return b.geom.lat-a.geom.lat;});
+    for(var f=0;f*2<orden.length;f++){
+      var fila=orden.slice(f*2,f*2+2).sort(function(a,b){return a.geom.lng-b.geom.lng;});
+      var yf=cy+(f-(Math.ceil(orden.length/2)-1)/2)*48;
+      if(fila.length===1)pos[fila[0].id]=[cx,yf];
+      else{pos[fila[0].id]=[cx-RX,yf];pos[fila[1].id]=[cx+RX,yf];}
+    }
+  }
+  // Caños hacia afuera
+  var ext=[];
+  inner.forEach(function(e){
+    S.conns.forEach(function(c){
+      if(c.net==='elec')return;
+      var o=c.from===e.id?c.to:(c.to===e.id?c.from:null);
+      if(!o||set[o]||!S.elems[o])return;
+      var r=rumboDib(centro,S.elems[o]),r2=rumboDib(e,S.elems[o]);
+      ext.push({inner:e.id,id:o,conn:c,ang:r.ang,d:r2.d,entrada:w.has(e.id)&&sin.has(o)});
+    });
+    // salidas configuradas sin caño cargado: se dibujan hacia el rumbo de su nombre
+    if(salidasConfiguradas(e))e.outlets.forEach(function(o,i){if(o&&!o.vecinoId)ext.push({inner:e.id,tapon:true,sal:i,ang:rumboDeNombre(o.name)});});
+  });
+  var sobran=ext.length>8?ext.slice(8):[];ext=ext.slice(0,8);
+  repartirEn(ext,8);
+  // Bebederos que corta cada caño de afuera (motor real, de a uno)
+  try{ext.forEach(function(x){if(x.tapon)return;S.conns=orig.filter(function(c){return c!==x.conn;});x.corta=nBase-bebederosConAgua(calcStates().watered);});}finally{S.conns=orig;}
+  var lineas='',etqs='',cajas='';
+  var linea=function(a,b,conAgua){return '<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+(conAgua?'#29b6f6':'#ef5350')+'" stroke-width="4"'+(conAgua?'':' stroke-dasharray="7 5"')+' stroke-linecap="round"/>';};
+  ext.forEach(function(x){
+    var a=pos[x.inner],b=LUG_EXT[x.slot],e=S.elems[x.inner],v=S.elems[x.id];
+    if(x.tapon){
+      var nom=e.outlets[x.sal].name||'Salida '+(x.sal+1);
+      var u1=salidaDeCaja(a,b,IHW,IHH),u2=1-salidaDeCaja(b,a,DIB_CAJA[0],DIB_CAJA[1]),u=(u1+u2)/2;
+      lineas+='<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="#6a9b6e" stroke-width="2" stroke-dasharray="7 5" stroke-linecap="round"/>';
+      etqs+=etiquetaSalidaDib(e,x.sal,a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u);
+      cajas+='<g class="lug-ext lug-tapon" data-de="'+escDib(e.id)+'" data-rumbo="'+DIB_RUMBO[x.slot]+'"><title>'+escDib((e.cod||e.name)+' · '+nom+': caño sin cargar')+'</title>'+
+        '<rect x="'+(b[0]-DIB_CAJA[0])+'" y="'+(b[1]-DIB_CAJA[1])+'" width="'+(2*DIB_CAJA[0])+'" height="'+(2*DIB_CAJA[1])+'" rx="5" fill="#162a18" stroke="#3d5e40" stroke-dasharray="4 3"/>'+
+        '<text x="'+b[0]+'" y="'+(b[1]-3)+'" text-anchor="middle" font-size="11" font-weight="600" fill="#c8e6c9">'+escDib(cortoDib(nom,16))+'</text>'+
+        '<text x="'+b[0]+'" y="'+(b[1]+10)+'" text-anchor="middle" font-size="9.5" fill="#6a9b6e">caño sin cargar</text></g>';
+      return;
+    }
+    lineas+=linea(a,b,w.has(x.inner)&&w.has(x.id));
+    var i=salidaHacia(e,x.id);
+    if(i!=null){var t1=salidaDeCaja(a,b,IHW,IHH),t2=1-salidaDeCaja(b,a,DIB_CAJA[0],DIB_CAJA[1]),t=(t1+t2)/2;etqs+=etiquetaSalidaDib(e,i,a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t);}
+    var dist=x.d==null?'':(x.d<1?' · '+Math.round(x.d*100)+' cm':' · '+Math.round(x.d)+' m');
+    var l2=x.entrada?'entra el agua'+dist:(v.type==='bebedero'?'bebedero'+dist:(x.corta?x.corta+' bebed.'+dist:'no corta bebed.'+dist));
+    var p=LUG_EXT[x.slot];
+    cajas+='<g class="lug-ext'+(x.entrada?' dib-entrada':'')+'" data-id="'+escDib(x.id)+'" data-rumbo="'+DIB_RUMBO[x.slot]+'"'+(sePuedeAbrir(v)?' data-abrir="'+escDib(x.id)+'" style="cursor:pointer"':'')+'>'+
+      '<title>'+escDib(etq(v))+'</title>'+
+      '<rect x="'+(p[0]-DIB_CAJA[0])+'" y="'+(p[1]-DIB_CAJA[1])+'" width="'+(2*DIB_CAJA[0])+'" height="'+(2*DIB_CAJA[1])+'" rx="5" fill="#162a18" stroke="'+(x.entrada?'#29b6f6':'#2d5e33')+'" stroke-width="'+(x.entrada?2:1)+'"/>'+
+      '<text x="'+p[0]+'" y="'+(p[1]-3)+'" text-anchor="middle" font-size="11" font-weight="600" fill="#c8e6c9">'+escDib(cortoDib(v.cod||v.name,16))+'</text>'+
+      '<text x="'+p[0]+'" y="'+(p[1]+10)+'" text-anchor="middle" font-size="9.5" fill="'+(x.entrada?'#29b6f6':'#6a9b6e')+'">'+escDib(l2)+'</text></g>';
+  });
+  // Caños entre las piezas del lugar
+  S.conns.forEach(function(c){
+    if(c.net==='elec'||!set[c.from]||!set[c.to]||c.from===c.to)return;
+    var a=pos[c.from],b=pos[c.to],A=S.elems[c.from],B=S.elems[c.to];
+    lineas+=linea(a,b,w.has(c.from)&&w.has(c.to));
+    var t1=salidaDeCaja(a,b,IHW,IHH),t2=1-salidaDeCaja(b,a,IHW,IHH);
+    var ia=salidaHacia(A,B.id),ib=salidaHacia(B,A.id);
+    var en=function(t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];};
+    if(ia!=null&&ib!=null){var p1=en(t1+(t2-t1)*0.28),p2=en(t1+(t2-t1)*0.72);etqs+=etiquetaSalidaDib(A,ia,p1[0],p1[1])+etiquetaSalidaDib(B,ib,p2[0],p2[1]);}
+    else if(ia!=null){var q=en((t1+t2)/2);etqs+=etiquetaSalidaDib(A,ia,q[0],q[1]);}
+    else if(ib!=null){var q2=en((t1+t2)/2);etqs+=etiquetaSalidaDib(B,ib,q2[0],q2[1]);}
+  });
+  inner.forEach(function(e){
+    var p=pos[e.id],ti=T[e.type]||{},cerrada=ti.valve&&!e.on&&!(JUNC.includes(e.type)&&e.outlets&&e.outlets.length);
+    cajas+='<g class="lug-pieza" data-id="'+escDib(e.id)+'"'+(sePuedeAbrir(e)?' data-abrir="'+escDib(e.id)+'" style="cursor:pointer"':'')+'>'+
+      '<title>'+escDib(etq(e))+'</title>'+
+      '<rect x="'+(p[0]-IHW)+'" y="'+(p[1]-IHH)+'" width="'+(2*IHW)+'" height="'+(2*IHH)+'" rx="6" fill="#1c3320" stroke="'+(cerrada?'#ef5350':'#81c784')+'" stroke-width="2"/>'+
+      '<text x="'+p[0]+'" y="'+(p[1]-3)+'" text-anchor="middle" font-size="10.5" font-weight="700" fill="#c8e6c9">'+escDib(cortoDib(e.cod||e.name,19))+'</text>'+
+      '<text x="'+p[0]+'" y="'+(p[1]+11)+'" text-anchor="middle" font-size="9.5" fill="'+(cerrada?'#ef5350':'#6a9b6e')+'">'+escDib(cerrada?'CERRADA':cortoDib(ti.lbl||e.type,16))+'</text></g>';
+  });
+  // Separación real entre las piezas del lugar
+  var maxd=0;inner.forEach(function(a){inner.forEach(function(b){var r=rumboDib(a,b);if(r.d!=null)maxd=Math.max(maxd,r.d);});});
+  var norte='<text x="420" y="16" text-anchor="middle" font-size="10" fill="#6a9b6e">N</text><path d="M420 20 L416 30 L420 27 L424 30 Z" fill="#6a9b6e"/>';
+  var html='<div class="dib"><svg viewBox="0 0 440 320" role="img" aria-label="Diagrama del lugar con '+inner.length+' piezas">'+norte+lineas+etqs+cajas+'</svg>'+
+    '<div class="dib-ley">Norte arriba. En el medio, las '+inner.length+' piezas de este lugar ('+(maxd<0.05?'en el mismo punto':(maxd<1?'a '+Math.round(maxd*100)+' cm':'a '+Math.round(maxd)+' m'))+' entre ellas). '+
+    '<span style="color:#29b6f6">Azul</span> con agua · <span style="color:#ef5350">rojo</span> sin agua. L = salida con llave · S = sin llave.</div>';
+  if(sobran.length)html+='<div class="dib-ley">También conectan con: '+sobran.map(function(x){return escDib(etq(S.elems[x.id]));}).join(', ')+'.</div>';
+  return html+'</div>';
+}
+// Piezas que en pantalla quedan pegadas a la tocada (no se pueden elegir con el dedo)
+function piezasJuntas(el){
+  var clicked=map.latLngToContainerPoint([el.geom.lat,el.geom.lng]);
+  return Object.values(S.elems).filter(function(p){
+    return p.id!==connFirst&&T[p.type]&&p.geom&&p.geom.type==='Point'&&
+      map.latLngToContainerPoint([p.geom.lat,p.geom.lng]).distanceTo(clicked)<=18;
+  });
+}
+function mostrarLugar(piezas){
+  map.closePopup();
+  document.getElementById('ml-title').textContent=piezas.length+' PIEZAS EN ESTE LUGAR';
+  document.getElementById('ml-dib').innerHTML=dibujoLugar(piezas.map(function(p){return p.id;}));
+  var lista=document.getElementById('ml-lista');
+  lista.innerHTML='';
+  piezas.forEach(function(piece){
+    var b=document.createElement('button');
+    b.type='button';
+    var code=piece.cod||(piece.type==='tanque'&&piece.sistema?'TQ'+piece.sistema:'');
+    b.textContent=[code,piece.name,piece.type==='tanque'?'':'S'+(piece.sistema||'—')].filter(Boolean).join(' · ');
+    b.onclick=function(){closeM('m-lugar');actuarSobrePieza(piece);};
+    lista.appendChild(b);
+  });
+  document.getElementById('ml-dib').querySelectorAll('[data-abrir]').forEach(function(g){
+    g.addEventListener('click',function(){var p=S.elems[g.getAttribute('data-abrir')];closeM('m-lugar');actuarSobrePieza(p);});
+  });
+  document.getElementById('m-lugar').classList.add('on');
 }
 
 function showJunc(id){
